@@ -1,0 +1,14 @@
+node_modules
+.next
+.env
+.env.local
+.env*.local
+*.log
+.vercel
+agent-state.json
+
+# local runtime state
+.sonar-store.json
+*.log
+dev.pid
+*.tsbuildinfo
