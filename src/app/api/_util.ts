@@ -9,4 +9,7 @@ export function fail(e: unknown) {
   return NextResponse.json({ error: 'INTERNAL', message: msg }, { status: 500 });
 }
 
+/** Sandbox requests go to Panta's pk_test_ fixtures: nothing on chain, no funds needed. */
+export const modeOf = (b: { sandbox?: unknown } | null | undefined): { mode: 'live' | 'test' } => ({ mode: b?.sandbox === true || b?.sandbox === '1' ? 'test' : 'live' });
+
 export const isPubkey = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);

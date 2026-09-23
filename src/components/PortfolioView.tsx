@@ -8,6 +8,7 @@ import { broadcast, compile, explorerTx } from '@/lib/solana';
 import { postJson, useApi } from './useApi';
 import { WalletButton } from './WalletButton';
 import { PoweredByPanta } from './PoweredByPanta';
+import { useSandbox } from './useSandbox';
 
 type Row = Position & { title: string; yesPrice: number | null; value: number | null; endTime: number | null };
 interface Payload { wallet: string; summary: { currentValueUsdc: string; primaryContributedUsdc: string } | null; positions: Row[] }
@@ -16,7 +17,8 @@ export function PortfolioView() {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const wallet = publicKey?.toBase58() ?? null;
-  const { data, error, loading, reload } = useApi<Payload>(wallet ? `/api/positions?wallet=${wallet}` : null, [wallet], 60_000);
+  const [sandbox] = useSandbox();
+  const { data, error, loading, reload } = useApi<Payload>(wallet ? `/api/positions?wallet=${wallet}${sandbox ? '&sandbox=1' : ''}` : null, [wallet, sandbox], 60_000);
   const [claiming, setClaiming] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const now = Date.now() / 1000;
@@ -25,11 +27,15 @@ export function PortfolioView() {
     if (!wallet || !publicKey || !signTransaction) return;
     setClaiming(marketId); setMsg(null);
     try {
-      const b = await postJson<{ instructions: never[]; recentBlockhash: string; lastValidBlockHeight?: number }>('/api/claim/build', { wallet, marketId });
-      const tx = compile(publicKey, b.instructions, b.recentBlockhash);
-      const signed = await signTransaction(tx);
-      const sig = await broadcast(connection, signed, b.lastValidBlockHeight);
-      try { await postJson('/api/trade/report', { signature: sig, kind: 'claim', wallet }); } catch { /* attribution is best-effort */ }
+      const b = await postJson<{ instructions: never[]; recentBlockhash: string; lastValidBlockHeight?: number }>('/api/claim/build', { wallet, marketId, sandbox });
+      let sig: string;
+      if (sandbox || b.instructions.length === 0) sig = `sandbox${Date.now()}`;
+      else {
+        const tx = compile(publicKey, b.instructions, b.recentBlockhash);
+        const signed = await signTransaction(tx);
+        sig = await broadcast(connection, signed, b.lastValidBlockHeight);
+      }
+      try { await postJson('/api/trade/report', { signature: sig, kind: 'claim', wallet, sandbox }); } catch { /* attribution is best-effort */ }
       setMsg(`Claimed. ${sig}`); reload();
     } catch (e) { const m = (e as Error).message; if (!/reject|cancel/i.test(m)) setMsg(`Claim failed: ${m}`); }
     finally { setClaiming(null); }
@@ -55,7 +61,7 @@ export function PortfolioView() {
         <div className="panel p-8 text-center text-sm"><p className="text-no">{error}</p><button className="btn mt-4" onClick={reload}>Retry</button></div>
       ) : data && data.positions.length === 0 ? (
         <div className="panel p-10 text-center text-sm text-fog">
-          No positions for <span className="mono text-paper">{wallet.slice(0, 4)}…{wallet.slice(-4)}</span>. <Link href="/">Find a market on the Radar.</Link>
+          No positions for <span className="mono text-paper">{wallet.slice(0, 4)}…{wallet.slice(-4)}</span>{sandbox ? ' in the sandbox (Panta fixtures return none)' : ''}. <Link href="/">Find a market on the Radar.</Link>
         </div>
       ) : data && (
         <>

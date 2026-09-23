@@ -151,6 +151,7 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
           <Li>Same pattern for claims (<span className="mono">/claim/build</span>) and market creation (<span className="mono">/markets/create/quote → build → register</span>).</Li>
           <Li>14 Panta endpoints integrated behind a typed, rate-limited server client. The API key never reaches the browser.</Li>
           <Li>Stable Panta error codes map to plain-language UI: stale quote, expired quote, market left primary, insufficient USDC.</Li>
+          <Li><strong className="text-paper">Sandbox switch.</strong> The same flows run against Panta&apos;s <span className="mono">pk_test_</span> fixtures with an empty wallet, so the product can be demonstrated, tested in CI and taught with zero spend.</Li>
         </ul>
         <Shot src="/screens/market.png" alt="Market page with the Sonar read, cross-venue block and trade panel" />
       </div>

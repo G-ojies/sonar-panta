@@ -6,12 +6,14 @@ import { broadcast, compile, explorerTx } from '@/lib/solana';
 import { cents, usd } from '@/lib/format';
 import { postJson } from './useApi';
 import { WalletButton } from './WalletButton';
+import { useSandbox } from './useSandbox';
 
 type Step = 'idle' | 'quoting' | 'quoted' | 'building' | 'signing' | 'broadcasting' | 'submitting' | 'done' | 'error';
 
 export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { market: MarketDetail; yesPrice: number | null; tradable: boolean; lean: SignalSet['side']; onDone?: () => void }) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
+  const [sandbox] = useSandbox();
   const [side, setSide] = useState<'yes' | 'no'>(lean === 'NO' ? 'no' : 'yes');
   const [amount, setAmount] = useState('5');
   const [slip, setSlip] = useState(150);
@@ -29,7 +31,7 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
     if (!wallet) return;
     setErr(null); setStep('quoting'); setQuote(null);
     try {
-      const q = await postJson<BuyQuote>('/api/trade/quote', { wallet, marketId: market.marketId, side, amountUsdc: amount });
+      const q = await postJson<BuyQuote>('/api/trade/quote', { wallet, marketId: market.marketId, side, amountUsdc: amount, sandbox });
       setQuote(q); setStep('quoted');
     } catch (e) { setErr((e as Error).message); setStep('error'); }
   }
@@ -39,16 +41,22 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
     setErr(null);
     try {
       setStep('building');
-      const b = await postJson<BuyBuild>('/api/trade/build', { wallet, quoteId: quote.quoteId, maxSlippageBps: slip });
-      setStep('signing');
-      const tx = compile(publicKey, b.instructions, b.recentBlockhash);
-      const signed = await signTransaction(tx);
-      setStep('broadcasting');
-      const signature = await broadcast(connection, signed, b.lastValidBlockHeight);
-      setSig(signature);
+      const b = await postJson<BuyBuild>('/api/trade/build', { wallet, quoteId: quote.quoteId, maxSlippageBps: slip, sandbox });
+      let signature: string;
+      if (sandbox || b.instructions.length === 0) {
+        // Sandbox fixtures carry no instructions: nothing to sign or broadcast. Panta accepts a placeholder signature.
+        signature = `sandbox${Date.now()}`;
+      } else {
+        setStep('signing');
+        const tx = compile(publicKey, b.instructions, b.recentBlockhash);
+        const signed = await signTransaction(tx);
+        setStep('broadcasting');
+        signature = await broadcast(connection, signed, b.lastValidBlockHeight);
+      }
       setStep('submitting');
-      await postJson('/api/trade/submit', { orderId: b.orderId, signature });
-      try { await postJson('/api/trade/report', { signature, kind: 'buy', wallet }); setReport('attributed'); }
+      const r = await postJson<{ submit?: { signature?: string }; verify?: { status?: string } }>('/api/trade/submit', { orderId: b.orderId, signature, sandbox });
+      setSig(sandbox ? r.submit?.signature ?? signature : signature);
+      try { await postJson('/api/trade/report', { signature, kind: 'buy', wallet, sandbox }); setReport('attributed'); }
       catch (e) { setReport(`report failed: ${(e as Error).message}`); }
       setStep('done'); onDone?.();
     } catch (e) {
@@ -62,10 +70,10 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
     <section className="panel p-4" aria-labelledby="trade-h">
       <div className="flex items-center justify-between">
         <h2 id="trade-h" className="font-medium">Trade</h2>
-        <span className="text-[11px] uppercase tracking-wide text-fog-2">non-custodial · mainnet USDC</span>
+        <span className={`text-[11px] uppercase tracking-wide ${sandbox ? 'text-amber' : 'text-fog-2'}`}>{sandbox ? 'sandbox · panta fixtures · no funds' : 'non-custodial · mainnet USDC'}</span>
       </div>
 
-      {!tradable ? (
+      {!tradable && !sandbox ? (
         <p className="mt-3 text-sm text-fog">
           {market.phase === 'resolved' ? 'This market has resolved. Winning shares are claimed from the Portfolio page.' :
            market.onChain?.isGraduated ? 'Primary window closed: this market graduated to secondary trading, which the public API does not expose yet.' :
@@ -120,7 +128,7 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
       )}
       {sig && (
         <div role="status" className="mt-3 rounded-md border border-yes/40 bg-yes/10 p-3 text-xs text-paper">
-          <div>Filled. <a href={explorerTx(sig)} target="_blank" rel="noopener noreferrer">View transaction ↗</a></div>
+          <div>{sandbox ? <>Filled in the sandbox. Panta returned signature <span className="mono">{sig.slice(0, 12)}…</span>; no transaction was sent.</> : <>Filled. <a href={explorerTx(sig)} target="_blank" rel="noopener noreferrer">View transaction ↗</a></>}</div>
           {report && <div className="mt-1 text-fog">{report === 'attributed' ? 'Trade reported to Panta (attributed to Sonar).' : report}</div>}
         </div>
       )}

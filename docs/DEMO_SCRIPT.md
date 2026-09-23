@@ -1,6 +1,6 @@
 # Sonar for Panta — video scripts
 
-Colosseum wants two videos: a **pitch** (≤ 3 min: team, problem, why, market, traction) and a **technical demo** (2–3 min). The Panta and Superteam Nigeria side tracks accept a Loom or the deck at `/pitch`. Record both with Loom, screen + voice, 1080p. For the Superteam NG pitch reviews (three are required, plus demo day) present `/pitch` with the arrow keys; every number on the traction slide is read live from the store.
+Colosseum wants two videos: a **pitch** (≤ 3 min: team, problem, why, market, traction) and a **technical demo** (2–3 min). The Panta and Superteam Nigeria side tracks accept a Loom or the deck at `/pitch`. Record both with Loom, screen + voice, 1080p. **Switch the header toggle to Sandbox before recording the trade, claim and create steps**: Panta's fixtures answer every call, nothing is sent on chain, and an empty wallet is enough. Say so on camera; judges reward honesty about what is live. For the Superteam NG pitch reviews (three are required, plus demo day) present `/pitch` with the arrow keys; every number on the traction slide is read live from the store.
 
 ## Pitch (≤ 3:00)
 
@@ -20,9 +20,9 @@ Colosseum wants two videos: a **pitch** (≤ 3 min: team, problem, why, market, 
 
 1. **Architecture (20s).** Server-side Panta client with a rate limiter and typed errors; radar refresh (list × status × category → detail → tape → venue match → snapshot → signals) on a cron; Upstash for persistence; every write is quote → build → sign in wallet → broadcast on our RPC → submit/register → report for attribution.
 2. **Radar (30s).** Filters: Open / Tradable / Cross-venue / Resolved. Point at score bars, confidence dots, venue gap column.
-3. **Market page (40s).** Sonar read with reasons; sparkline built from our own snapshots ("Panta has no price history endpoint, so we record one"); cross-venue block; resolution rule from `onChain`; tape with Solscan links. Trade panel: get quote (show fee, shares, expiry), sign in Phantom, transaction link, "attributed" badge.
+3. **Market page (40s).** Sonar read with reasons; sparkline built from our own snapshots ("Panta has no price history endpoint, so we record one"); cross-venue block; resolution rule from `onChain`; tape with Solscan links. Trade panel (sandbox on): get quote (show shares, expiry), Sign & buy, the sandbox signature Panta returns, the "attributed" badge. Say: "Same code path on mainnet, the wallet signs the built instructions and we broadcast."
 4. **Portfolio + claim (20s).** Positions marked to live prices; Claim button builds `claim_win_usdc` via the API.
-5. **Create (30s).** Paste a headline → draft → quote (50 USDC fee split) → sign → registered on Panta.
+5. **Create (30s, sandbox on).** Click a Nigeria starter (CBN) → draft → quote (50 USDC fee split shown, not paid) → Sign & create → registered fixture id.
 6. **Agent (20s).** Paper positions, settlement log, backtest table. Mention `SONAR_AGENT_MODE=live`.
 7. **Feedback (10s).** Flash `docs/PANTA-API-FEEDBACK.md` (14 items) and `docs/BUSINESS-PLAN.md`.
 

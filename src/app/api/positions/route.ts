@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarket, getPositions, marketYesPrice } from '@/lib/panta';
-import { fail, isPubkey } from '../_util';
+import { fail, isPubkey, modeOf } from '../_util';
 
 export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const wallet = req.nextUrl.searchParams.get('wallet');
   if (!isPubkey(wallet)) return NextResponse.json({ error: 'BAD_WALLET' }, { status: 400 });
   try {
-    const p = await getPositions(wallet);
+    const mode = modeOf({ sandbox: req.nextUrl.searchParams.get('sandbox') ?? undefined });
+    const p = await getPositions(wallet, mode);
     const ids = [...new Set(p.positions.map((x) => x.marketId))];
     const details = Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await getMarket(id).catch(() => null)] as const)));
     const rows = p.positions.map((pos) => {

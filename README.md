@@ -26,6 +26,10 @@ Every write is non-custodial: Panta builds instructions, the user's wallet signs
 <img src="public/screens/agent.png" width="49%" alt="Agent page: paper positions and the backtest over resolved Panta markets" />
 </p>
 
+## Zero-cost demo (sandbox mode)
+
+The header has a **Mainnet / Sandbox** switch (or open any page with `?sandbox=1`). In sandbox mode every write (buy quote, build, submit, verify, claim, market creation, attribution) goes to Panta's `pk_test_` fixtures: the whole flow runs, Panta returns order ids and signatures, and nothing is sent to Solana. A connected wallet with zero balance is enough. The radar, market pages and agent keep using live data. This is how the demo video was recorded; no funds were spent anywhere in this project.
+
 ## Run it
 
 ```bash
@@ -36,7 +40,7 @@ npm run agent                # one agent tick (refresh + open/settle paper posit
 npm run dev                  # http://localhost:3000
 ```
 
-Optional env: `KV_REST_API_URL`/`KV_REST_API_TOKEN` (Upstash, for persistence on Vercel), `ANTHROPIC_API_KEY` (Claude drafting; falls back to a template), `CRON_SECRET` (protects `/api/refresh` and `/api/agent`), `SONAR_AGENT_MODE=live` + `SONAR_AGENT_KEYPAIR` (JSON secret key) to execute real primary buys, `SONAR_STORE_FILE` for a JSON file store when running scripts locally.
+`PANTA_TEST_API_KEY` (a `pk_test_` key) enables sandbox mode. Optional env: `KV_REST_API_URL`/`KV_REST_API_TOKEN` (Upstash, for persistence on Vercel), `ANTHROPIC_API_KEY` (Claude drafting; falls back to a template), `CRON_SECRET` (protects `/api/refresh` and `/api/agent`), `SONAR_AGENT_MODE=live` + `SONAR_AGENT_KEYPAIR` (JSON secret key) to execute real primary buys, `SONAR_STORE_FILE` for a JSON file store when running scripts locally.
 
 Production: see [docs/DEPLOY.md](docs/DEPLOY.md). The radar refresh and agent tick run every 10 minutes from [`.github/workflows/sonar-tick.yml`](.github/workflows/sonar-tick.yml) into Upstash; Vercel only serves.
 

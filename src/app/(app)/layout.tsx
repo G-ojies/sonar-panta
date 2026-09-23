@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { WalletButton } from '@/components/WalletButton';
 import { PoweredByPanta } from '@/components/PoweredByPanta';
+import { SandboxBanner, SandboxToggle } from '@/components/SandboxToggle';
 
 const nav = [
   { href: '/', label: 'Radar' },
@@ -28,11 +29,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <Link href="/pitch" className="hidden text-xs text-fog-2 no-underline hover:text-paper md:inline">Pitch</Link>
+            <SandboxToggle />
             <PoweredByPanta compact />
             <WalletButton />
           </div>
         </div>
       </header>
+      <SandboxBanner />
       <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
       <footer className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-6 text-xs text-fog-2">
         <span>Sonar is analytics, not advice. Trades are non-custodial: you sign every transaction in your own wallet.</span>

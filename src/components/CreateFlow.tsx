@@ -8,6 +8,7 @@ import { marketUrl } from '@/lib/panta-public';
 import { postJson } from './useApi';
 import { WalletButton } from './WalletButton';
 import { PoweredByPanta } from './PoweredByPanta';
+import { useSandbox } from './useSandbox';
 
 const CATS = ['sports', 'crypto', 'politics', 'entertainment', 'finance', 'science', 'world', 'other'];
 
@@ -38,6 +39,7 @@ export function CreateFlow() {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const wallet = publicKey?.toBase58();
+  const [sandbox] = useSandbox();
   const [input, setInput] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [imageUrl, setImageUrl] = useState('');
@@ -66,7 +68,7 @@ export function CreateFlow() {
 
   async function doQuote() {
     setErr(null); setStep('quoting');
-    try { setQuote(await postJson<CreateQuote>('/api/create/quote', body())); } catch (e) { setErr((e as Error).message); }
+    try { setQuote(await postJson<CreateQuote>('/api/create/quote', { ...body(), sandbox })); } catch (e) { setErr((e as Error).message); }
     finally { setStep('idle'); }
   }
 
@@ -75,13 +77,18 @@ export function CreateFlow() {
     setErr(null);
     try {
       setStep('building');
-      const b = await postJson<CreateBuild>('/api/create/build', { createId: quote.createId, wallet });
-      setStep('signing');
-      const signed = await signTransaction(deserialize(b.transaction));
-      setStep('broadcasting');
-      const sig = await broadcast(connection, signed, b.lastValidBlockHeight);
+      const b = await postJson<CreateBuild>('/api/create/build', { createId: quote.createId, wallet, sandbox });
+      let sig: string;
+      if (sandbox || !b.transaction) {
+        sig = `sandbox${Date.now()}`; // fixture build carries no transaction: nothing to sign
+      } else {
+        setStep('signing');
+        const signed = await signTransaction(deserialize(b.transaction));
+        setStep('broadcasting');
+        sig = await broadcast(connection, signed, b.lastValidBlockHeight);
+      }
       setStep('registering');
-      const r = await postJson<{ marketId: string }>('/api/create/register', { createId: quote.createId, signature: sig });
+      const r = await postJson<{ marketId: string }>('/api/create/register', { createId: quote.createId, signature: sig, sandbox });
       setResult({ marketId: r.marketId ?? quote.expectedEventPda, sig }); setStep('done');
     } catch (e) { const m = (e as Error).message; if (!/reject|cancel/i.test(m)) setErr(m); setStep('idle'); }
   }
@@ -153,7 +160,8 @@ export function CreateFlow() {
             <span className="text-xs text-fog-2">Trading opens about an hour after creation (on-chain minimum start delay).</span>
           </div>
           {err && <p role="alert" className="text-xs text-no">{err}</p>}
-          {result && <p role="status" className="text-sm">Market created. <a href={marketUrl(result.marketId)} target="_blank" rel="noopener noreferrer">View on Panta ↗</a> · <a href={explorerTx(result.sig)} target="_blank" rel="noopener noreferrer">transaction ↗</a></p>}
+          {result && (sandbox ? <p role="status" className="text-sm">Registered in the sandbox as <span className="mono">{result.marketId}</span>. Panta fixtures only; no fee was paid and nothing was sent on chain.</p>
+            : <p role="status" className="text-sm">Market created. <a href={marketUrl(result.marketId)} target="_blank" rel="noopener noreferrer">View on Panta ↗</a> · <a href={explorerTx(result.sig)} target="_blank" rel="noopener noreferrer">transaction ↗</a></p>)}
         </section>
       )}
     </div>
