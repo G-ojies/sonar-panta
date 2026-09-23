@@ -31,7 +31,7 @@ vercel env add ANTHROPIC_API_KEY production        # optional: Claude drafting o
 vercel --prod
 ```
 
-`vercel.json` also declares two crons (`/api/refresh` every 10 min, `/api/agent` twice an hour). On the Hobby plan Vercel only runs crons daily, so the GitHub Actions job below is the primary scheduler; the Vercel crons are a harmless extra on Pro.
+`vercel.json` declares one daily cron (`/api/refresh` at 06:00 UTC) as a fallback: the Hobby plan rejects anything more frequent, so the GitHub Actions job below is the primary scheduler.
 
 ## 3. Scheduler (GitHub Actions)
 
