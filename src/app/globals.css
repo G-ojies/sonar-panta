@@ -43,3 +43,21 @@
 .wallet-adapter-button:hover { @apply border-fog-2 bg-ink-3 !important; }
 .wallet-adapter-modal-wrapper { @apply bg-ink-2 !important; }
 .wallet-adapter-modal-list li button { @apply text-paper !important; }
+
+/* ---- pitch deck (/pitch) ---- */
+.deck { position: relative; min-height: 100vh; background: theme('colors.ink.DEFAULT'); }
+.slide { display: none; min-height: 100vh; flex-direction: column; padding: 4vh 6vw 8vh; }
+.slide.is-active { display: flex; animation: slide-in 220ms ease-out; }
+.slide-inner { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 1200px; width: 100%; margin: 0 auto; }
+.slide-foot { position: fixed; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 6vw; font-size: 11px; color: theme('colors.fog.2'); border-top: 1px solid theme('colors.line'); background: theme('colors.ink.DEFAULT'); }
+.deck-nav { position: fixed; top: 12px; right: 6vw; display: flex; align-items: center; gap: 10px; z-index: 5; }
+@keyframes slide-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .slide.is-active { animation: none; } }
+@media print {
+  .deck-nav, .slide-foot .ping-dot { display: none !important; }
+  .slide { display: flex !important; break-after: page; page-break-after: always; height: 100vh; min-height: 0; padding: 24px 40px 48px; }
+  .slide-foot { position: absolute; }
+  .slide img { max-height: 52vh; width: auto; }
+  @page { size: 1280px 720px; margin: 0; }
+  html, body { background: #0b0f14 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

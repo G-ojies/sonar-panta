@@ -56,9 +56,10 @@ function memoryBackend(file?: string): Backend {
   };
   return {
     async get(k) { sync(); const c = kv[k]; if (!c) return null; if (c.exp && c.exp < Date.now()) { delete kv[k]; return null; } return c.v as never; },
-    async set(k, v, ttl) { kv[k] = { v, exp: ttl ? Date.now() + ttl * 1000 : undefined }; persist(); },
-    async del(k) { delete kv[k]; persist(); },
-    async lpush(k, v, cap) { const l = (lists[k] ??= []); l.unshift(v); if (cap && l.length > cap) l.length = cap; persist(); },
+    // reload before every write so a process with a stale copy never overwrites another writer's data
+    async set(k, v, ttl) { sync(); kv[k] = { v, exp: ttl ? Date.now() + ttl * 1000 : undefined }; persist(); },
+    async del(k) { sync(); delete kv[k]; persist(); },
+    async lpush(k, v, cap) { sync(); const l = (lists[k] ??= []); l.unshift(v); if (cap && l.length > cap) l.length = cap; persist(); },
     async lrange(k, a, b) { sync(); const l = lists[k] ?? []; return l.slice(a, b === -1 ? undefined : b + 1) as never; },
   };
 }

@@ -28,3 +28,7 @@ Everything below was reproduced with a `pk_live_` key unless stated.
 - Titles + `tradable` flag on list rows; working cursor; `status=resolved` filter.
 - A websocket or `since=` parameter on `/markets/{id}/trades/` for tape streaming.
 - A public "markets opened in the last N hours" feed so bots can catch primary windows, which are short for breaking markets.
+
+## Added 23 September 2026
+13. **`category` is `sports` on most non-sport markets** — of 113 detail rows scanned, 74 carry `category: "sports"`, including "Will Bitcoin hit $65,000 in the next 10 minutes?", "Will it rain anywhere in London in the next 30 minutes?" and "Base Blockchain to announce airdrop rewards". It looks like breaking markets default to `sports` at creation. Category filters on `GET /markets/` are therefore unreliable for discovery.
+14. **Listing pages rotate between scans** — two `GET /markets/?status=secondary` scans four minutes apart returned different 50-row sets, and live markets ("Will GTA 6 release on November 19th, 2026?") disappeared from the listing while still `isActive` on chain. Integrators must keep their own registry of ids; a stable sort (`createdAt desc`) plus a working cursor would fix both this and item 2.

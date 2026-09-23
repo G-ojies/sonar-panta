@@ -8,7 +8,7 @@ import { ConfidenceDots, ScoreBar, SideChip } from './SignalBadge';
 type Filter = 'all' | 'open' | 'tradable' | 'matched' | 'resolved';
 
 export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: number }) {
-  const [filter, setFilter] = useState<Filter>('open');
+  const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -23,8 +23,15 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
     });
   }, [markets, filter, q]);
 
+  const counts = useMemo(() => ({
+    all: markets.length,
+    open: markets.filter((m) => m.detail.onChain?.isActive).length,
+    tradable: markets.filter((m) => m.tradable).length,
+    matched: markets.filter((m) => m.venue).length,
+    resolved: markets.filter((m) => m.detail.phase === 'resolved').length,
+  }), [markets]);
   const tabs: { k: Filter; label: string }[] = [
-    { k: 'open', label: 'Open' }, { k: 'tradable', label: 'Tradable' }, { k: 'matched', label: 'Cross-venue' }, { k: 'resolved', label: 'Resolved' }, { k: 'all', label: 'All' },
+    { k: 'all', label: 'All' }, { k: 'open', label: 'Open' }, { k: 'tradable', label: 'Tradable' }, { k: 'matched', label: 'Cross-venue' }, { k: 'resolved', label: 'Resolved' },
   ];
 
   return (
@@ -34,7 +41,7 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
           {tabs.map((t) => (
             <button key={t.k} role="tab" aria-selected={filter === t.k} onClick={() => setFilter(t.k)}
               className={`h-9 rounded-md px-3 text-sm ${filter === t.k ? 'bg-ink-3 text-paper' : 'text-fog hover:text-paper'}`}>
-              {t.label}
+              {t.label} <span className="mono ml-1 text-[11px] text-fog-2">{counts[t.k]}</span>
             </button>
           ))}
         </div>

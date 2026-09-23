@@ -10,6 +10,27 @@ import { WalletButton } from './WalletButton';
 import { PoweredByPanta } from './PoweredByPanta';
 
 const CATS = ['sports', 'crypto', 'politics', 'entertainment', 'finance', 'science', 'world', 'other'];
+
+/**
+ * Starting points for creators. Panta's catalog has no African markets yet; these are the
+ * questions Nigerian traders already argue about every week. They are prompts, not final
+ * markets: the drafter turns one into a question + resolution rule, and you edit before quoting.
+ */
+const STARTERS: { group: string; items: string[] }[] = [
+  { group: 'Nigeria', items: [
+    'CBN Monetary Policy Committee: will the MPR be held unchanged at the next meeting?',
+    'NBS inflation report: will September 2026 headline inflation print below the August figure?',
+    'Naira: will the official NFEM closing rate on 31 October 2026 be stronger than its 30 September close?',
+    'NGX All-Share Index: will it close October 2026 above its September close?',
+    'Super Eagles: will Nigeria win its next competitive fixture?',
+    'PMS pump price: will NNPC or Dangote announce a petrol price cut before 31 October 2026?',
+  ] },
+  { group: 'Global', items: [
+    'Will Bitcoin close above its 1 October 2026 open on 31 October 2026 (Coinbase daily close)?',
+    'Will the Fed change the federal funds target range at its next FOMC meeting?',
+    'Will Solana daily transactions exceed Ethereum L1 every day of October 2026?',
+  ] },
+];
 const toLocal = (unix: number) => new Date(unix * 1000 - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 const fromLocal = (s: string) => Math.floor(new Date(s).getTime() / 1000);
 
@@ -80,6 +101,20 @@ export function CreateFlow() {
         <div className="flex flex-col gap-2 sm:flex-row">
           <input id="in" className="field" value={input} onChange={(e) => setInput(e.target.value)} placeholder="e.g. Will BTC close above $120k on 1 October?" />
           <button className="btn btn-primary shrink-0" disabled={busy || input.trim().length < 8} onClick={doDraft}>{step === 'drafting' ? 'Drafting…' : 'Draft market'}</button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {STARTERS.map((g) => (
+            <div key={g.group} className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-[11px] uppercase tracking-wide text-fog-2">{g.group}</span>
+              {g.items.map((t) => (
+                <button key={t} type="button" onClick={() => { setInput(t); setDraft(null); setQuote(null); }}
+                  className="rounded-md border border-line px-2 py-1 text-left text-xs text-fog hover:border-fog-2 hover:text-paper" title={t}>
+                  {t.split(':')[0].replace(/\?$/, '')}
+                </button>
+              ))}
+            </div>
+          ))}
+          <p className="text-xs text-fog-2">Panta lists no African markets yet. Creators earn a share of every trade their market attracts, so the first Nigerian boards are open ground.</p>
         </div>
       </section>
 

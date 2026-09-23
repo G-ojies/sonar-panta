@@ -17,6 +17,7 @@ const K = {
   tape: (id: string) => `sonar:tape:${id}`,
   log: 'sonar:refresh-log',
   resolved: 'sonar:resolved-ids',
+  known: 'sonar:known-ids',
 };
 /** Ids of every resolved market a scan has passed. The catalog rotates, so the backtest replays from this. */
 export const RESOLVED_IDS_KEY = K.resolved;
@@ -41,7 +42,8 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
 function shouldTrack(d: MarketDetail, now: number): boolean {
   if (d.phase === 'cancelled') return false;
   if (!(d.title || d.question || d.onChain?.question)) return false; // stale devnet-era rows have no text
-  if (d.phase === 'resolved' && (d.onChain?.resolvedAt ?? 0) < now - 30 * 86400) return false;
+  // keep four months of resolved history: it feeds the backtest and gives the radar a record to show
+  if (d.phase === 'resolved') return (d.onChain?.resolvedAt ?? Number(d.endTime)) > now - 120 * 86400;
   // Catalog phases go stale: keep anything the chain still calls active, or that ended < 7d ago
   if (d.onChain?.isActive) return true;
   return Number(d.endTime) > now - 7 * 86400;
@@ -54,7 +56,14 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   const s = store();
 
   const rows = await listOpenMarkets(undefined, (m) => errors.push(m));
-  const ids = rows.map((r) => r.marketId).slice(0, opts.maxMarkets ?? 250);
+  // The catalog's 50-row pages rotate between scans, so a market listed once can vanish from the
+  // next listing while still being live. Track the union of what we see now and what we have seen.
+  const knownIds = (await s.get<string[]>(K.known)) ?? [];
+  const idSet = new Set<string>(rows.map((r) => r.marketId));
+  const listed = idSet.size;
+  for (const id of knownIds) idSet.add(id);
+  const ids = [...idSet].slice(0, opts.maxMarkets ?? 400);
+  if (listed === 0) errors.push('listing returned nothing: refreshing from the known-id registry only');
   if (ids.length === 0) {
     // Never replace a good radar with an empty one (transient API failure).
     const prev = await s.get<RadarOutput>(K.radar);
@@ -76,6 +85,8 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   for (const d of fetched) if (d?.phase === 'resolved') known.add(d.marketId);
   if (known.size !== before) await s.set(K.resolved, [...known].slice(-1000));
   const details = fetched.filter((d): d is MarketDetail => !!d && shouldTrack(d, now));
+  // remember every id that is still worth tracking (cancelled / long-resolved rows fall out here)
+  await s.set(K.known, [...new Set([...details.map((d) => d.marketId), ...ids.filter((_, i) => fetched[i] === null)])].slice(-2000));
 
   const markets = await mapLimit(details, 4, async (d): Promise<RadarMarket | null> => {
     try {
