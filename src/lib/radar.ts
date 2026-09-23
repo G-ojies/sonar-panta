@@ -84,7 +84,8 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
         errors.push(`detail ${id}: stripped row from Panta, no cached copy`);
         return null;
       }
-      await s.set(K.detail(id), d, 6 * 3600);
+      // resolved rows never change: keep them for a month so a stripped answer later has a good copy to fall back on
+      await s.set(K.detail(id), d, d.phase === 'resolved' ? 30 * 86400 : 6 * 3600);
       return d;
     } catch (e) { errors.push(`detail ${id}: ${(e as Error).message}`); return null; }
   });
