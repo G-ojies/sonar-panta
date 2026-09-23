@@ -71,11 +71,19 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
     if (prev) return { ...prev, errors: [...errors, 'empty scan: served previous radar'] };
   }
 
+  const hasContent = (d: MarketDetail | null | undefined): d is MarketDetail => !!d && !!(d.title || d.question || d.onChain?.question || d.onChain);
   const fetched = await mapLimit(ids, 4, async (id) => {
     try {
       const cached = await s.get<MarketDetail>(K.detail(id));
-      if (cached && cached.phase === 'resolved') return cached; // resolved rows never change
+      if (cached && cached.phase === 'resolved' && hasContent(cached)) return cached; // resolved rows never change
       const d = await getMarket(id);
+      // Panta's detail endpoint intermittently answers with a stripped row (blank title, no onChain
+      // state, phase reset to "secondary"). Never let that overwrite a good row or drop the market.
+      if (!hasContent(d)) {
+        if (hasContent(cached)) return cached;
+        errors.push(`detail ${id}: stripped row from Panta, no cached copy`);
+        return null;
+      }
       await s.set(K.detail(id), d, 6 * 3600);
       return d;
     } catch (e) { errors.push(`detail ${id}: ${(e as Error).message}`); return null; }
@@ -85,8 +93,10 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   for (const d of fetched) if (d?.phase === 'resolved') known.add(d.marketId);
   if (known.size !== before) await s.set(K.resolved, [...known].slice(-1000));
   const details = fetched.filter((d): d is MarketDetail => !!d && shouldTrack(d, now));
-  // remember every id that is still worth tracking (cancelled / long-resolved rows fall out here)
-  await s.set(K.known, [...new Set([...details.map((d) => d.marketId), ...ids.filter((_, i) => fetched[i] === null)])].slice(-2000));
+  // remember every id we have ever seen; only a *good* row that fails shouldTrack (cancelled,
+  // long resolved) drops out. Failed or stripped fetches stay so the next scan retries them.
+  const drop = new Set(ids.filter((_, i) => fetched[i] && !shouldTrack(fetched[i] as MarketDetail, now)));
+  await s.set(K.known, [...new Set([...knownIds, ...ids])].filter((id) => !drop.has(id)).slice(-2000));
 
   const markets = await mapLimit(details, 4, async (d): Promise<RadarMarket | null> => {
     try {
