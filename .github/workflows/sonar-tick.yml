@@ -21,9 +21,19 @@ jobs:
       NEXT_PUBLIC_SOLANA_RPC: ${{ secrets.SOLANA_RPC || 'https://api.mainnet-beta.solana.com' }}
       SONAR_AGENT_MODE: ${{ vars.SONAR_AGENT_MODE || 'paper' }}
     steps:
+      - name: Check secrets
+        id: check
+        run: |
+          if [ -z "$PANTA_API_KEY" ] || [ -z "$KV_REST_API_URL" ]; then
+            echo "::notice::PANTA_API_KEY / KV_REST_API_URL not set; skipping tick (see docs/DEPLOY.md)"; echo "ok=false" >> "$GITHUB_OUTPUT"
+          else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
       - uses: actions/checkout@v4
+        if: steps.check.outputs.ok == 'true'
       - uses: actions/setup-node@v4
+        if: steps.check.outputs.ok == 'true'
         with: { node-version: 20, cache: npm }
       - run: npm ci
+        if: steps.check.outputs.ok == 'true'
       - name: Refresh radar, run agent, backtest
+        if: steps.check.outputs.ok == 'true'
         run: npm run agent
