@@ -10,6 +10,9 @@ import { WalletButton } from './WalletButton';
 import { PoweredByPanta } from './PoweredByPanta';
 import { useSandbox } from './useSandbox';
 
+/** Read-only address used when sandbox mode is on and no wallet is connected: Panta's fixtures accept any pubkey and nothing is signed. */
+const DEMO_WALLET = 'FHj8ZbHfcbYNhsLU7MyeckpR1a4ZQz8c5F1jyaBdr513';
+
 const CATS = ['sports', 'crypto', 'politics', 'entertainment', 'finance', 'science', 'world', 'other'];
 
 /**
@@ -38,8 +41,8 @@ const fromLocal = (s: string) => Math.floor(new Date(s).getTime() / 1000);
 export function CreateFlow() {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
-  const wallet = publicKey?.toBase58();
   const [sandbox] = useSandbox();
+  const wallet = publicKey?.toBase58() ?? (sandbox ? DEMO_WALLET : undefined);
   const [input, setInput] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [imageUrl, setImageUrl] = useState('');
@@ -73,7 +76,8 @@ export function CreateFlow() {
   }
 
   async function doCreate() {
-    if (!quote || !wallet || !signTransaction) return;
+    if (!quote || !wallet) return;
+    if (!sandbox && !signTransaction) return;
     setErr(null);
     try {
       setStep('building');
@@ -83,7 +87,7 @@ export function CreateFlow() {
         sig = `sandbox${Date.now()}`; // fixture build carries no transaction: nothing to sign
       } else {
         setStep('signing');
-        const signed = await signTransaction(deserialize(b.transaction));
+        const signed = await signTransaction!(deserialize(b.transaction));
         setStep('broadcasting');
         sig = await broadcast(connection, signed, b.lastValidBlockHeight);
       }

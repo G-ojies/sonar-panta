@@ -8,6 +8,9 @@ import { postJson } from './useApi';
 import { WalletButton } from './WalletButton';
 import { useSandbox } from './useSandbox';
 
+/** Read-only address used when sandbox mode is on and no wallet is connected: Panta's fixtures accept any pubkey and nothing is signed. */
+const DEMO_WALLET = 'FHj8ZbHfcbYNhsLU7MyeckpR1a4ZQz8c5F1jyaBdr513';
+
 type Step = 'idle' | 'quoting' | 'quoted' | 'building' | 'signing' | 'broadcasting' | 'submitting' | 'done' | 'error';
 
 export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { market: MarketDetail; yesPrice: number | null; tradable: boolean; lean: SignalSet['side']; onDone?: () => void }) {
@@ -24,7 +27,7 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
   const [report, setReport] = useState<string | null>(null);
 
   const busy = !['idle', 'quoted', 'done', 'error'].includes(step);
-  const wallet = publicKey?.toBase58();
+  const wallet = publicKey?.toBase58() ?? (sandbox ? DEMO_WALLET : undefined);
   const px = yesPrice === null ? null : side === 'yes' ? yesPrice : 1 - yesPrice;
 
   async function getQuote() {
@@ -37,7 +40,8 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
   }
 
   async function execute() {
-    if (!wallet || !publicKey || !signTransaction || !quote) return;
+    if (!wallet || !quote) return;
+    if (!sandbox && (!publicKey || !signTransaction)) return;
     setErr(null);
     try {
       setStep('building');
@@ -48,8 +52,8 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
         signature = `sandbox${Date.now()}`;
       } else {
         setStep('signing');
-        const tx = compile(publicKey, b.instructions, b.recentBlockhash);
-        const signed = await signTransaction(tx);
+        const tx = compile(publicKey!, b.instructions, b.recentBlockhash);
+        const signed = await signTransaction!(tx);
         setStep('broadcasting');
         signature = await broadcast(connection, signed, b.lastValidBlockHeight);
       }
@@ -110,12 +114,13 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
             </dl>
           )}
 
-          {!wallet ? <WalletButton /> : (
+          {!wallet ? <WalletButton /> : (<>
+            {!publicKey && sandbox && <p className="text-xs text-amber">No wallet connected: using a read-only demo address in the sandbox.</p>}
             <button type="submit" disabled={busy} className={`btn w-full ${step === 'quoted' ? 'btn-primary' : ''}`}>
               {step === 'idle' || step === 'error' ? 'Get quote' : step === 'quoting' ? 'Quoting…' : step === 'quoted' ? `Sign & buy ${side.toUpperCase()}` :
                step === 'building' ? 'Building transaction…' : step === 'signing' ? 'Approve in wallet…' : step === 'broadcasting' ? 'Broadcasting…' : step === 'submitting' ? 'Confirming with Panta…' : 'Done'}
             </button>
-          )}
+          </>)}
           {step === 'quoted' && <p className="text-xs text-fog-2">Panta builds the instructions; your wallet signs; we broadcast on our RPC and file the signature back for attribution.</p>}
         </form>
       )}

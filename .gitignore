@@ -12,3 +12,4 @@ agent-state.json
 *.log
 dev.pid
 *.tsbuildinfo
+.env*
