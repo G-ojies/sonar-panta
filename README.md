@@ -79,7 +79,7 @@ The **backtest** replays the first 60% of each resolved market's tape through th
 ## Documents
 
 - [docs/BUSINESS-PLAN.md](docs/BUSINESS-PLAN.md): problem, product, model, go-to-market, market size, competition, risks, ask.
-- [docs/PANTA-API-FEEDBACK.md](docs/PANTA-API-FEEDBACK.md): fourteen issues and gaps found during the build, with reproductions.
+- [docs/PANTA-API-FEEDBACK.md](docs/PANTA-API-FEEDBACK.md): fifteen issues and gaps found during the build, with reproductions.
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md): pitch and technical demo video scripts.
 - [docs/SUBMISSION.md](docs/SUBMISSION.md): answers for the Colosseum, Superteam Nigeria and Panta forms.
 - [docs/DEPLOY.md](docs/DEPLOY.md): Vercel + Upstash + GitHub Actions.

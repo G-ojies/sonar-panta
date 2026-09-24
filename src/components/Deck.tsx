@@ -168,7 +168,7 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
         <Stat v={String(live.markets)} l="Panta markets on the radar now" />
         <Stat v={String(live.matched)} l="matched to Polymarket / Kalshi" />
         <Stat v={String(live.agentOpen + live.agentClosed)} l={`agent positions (${live.agentWon} won of ${live.agentClosed} settled)`} />
-        <Stat v="12" l="Panta API issues documented for the team" />
+        <Stat v="15" l="Panta API issues documented for the team" />
       </div>
       <ul className="mt-8 space-y-3">
         <Li>Sonar has run live on Kalshi and Polymarket since mid-2026 (sonar.nodalytics.xyz). This build ports the engine to Panta&apos;s on-chain tape and adds what Panta does not expose.</Li>
