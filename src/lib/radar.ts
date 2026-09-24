@@ -76,9 +76,11 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
     try {
       const cached = await s.get<MarketDetail>(K.detail(id));
       if (cached && cached.phase === 'resolved' && hasContent(cached)) return cached; // resolved rows never change
-      const d = await getMarket(id);
+      let d = await getMarket(id);
       // Panta's detail endpoint intermittently answers with a stripped row (blank title, no onChain
-      // state, phase reset to "secondary"). Never let that overwrite a good row or drop the market.
+      // state, phase reset to "secondary"). Retry once, then fall back to the cached row; never let a
+      // stripped answer overwrite a good row or drop the market.
+      if (!hasContent(d)) { await new Promise((r) => setTimeout(r, 400)); d = await getMarket(id); }
       if (!hasContent(d)) {
         if (hasContent(cached)) return cached;
         errors.push(`detail ${id}: stripped row from Panta, no cached copy`);
