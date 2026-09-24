@@ -13,3 +13,4 @@ agent-state.json
 dev.pid
 *.tsbuildinfo
 .env*
+docs/video/
