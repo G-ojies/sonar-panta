@@ -42,7 +42,7 @@ npm run dev                  # http://localhost:3000
 
 `PANTA_TEST_API_KEY` (a `pk_test_` key) enables sandbox mode. Optional env: `KV_REST_API_URL`/`KV_REST_API_TOKEN` (Upstash, for persistence on Vercel), `ANTHROPIC_API_KEY` (Claude drafting; falls back to a template), `CRON_SECRET` (protects `/api/refresh` and `/api/agent`), `SONAR_AGENT_MODE=live` + `SONAR_AGENT_KEYPAIR` (JSON secret key) to execute real primary buys, `SONAR_STORE_FILE` for a JSON file store when running scripts locally.
 
-Production: https://sonar-panta.nodalytics.xyz, a Render free web service defined in `render.yaml`; see [docs/DEPLOY.md](docs/DEPLOY.md). The radar refresh and agent tick run every 10 minutes: a pinger calls `POST /api/agent`, which does the work in the background and writes to Upstash; [`.github/workflows/sonar-tick.yml`](.github/workflows/sonar-tick.yml) is the fallback (GitHub throttles its cron to every few hours).
+Production: https://sonarpanta.xyz, a Render free web service defined in `render.yaml`; see [docs/DEPLOY.md](docs/DEPLOY.md). The radar refresh and agent tick run every 10 minutes: a pinger calls `POST /api/agent`, which does the work in the background and writes to Upstash; [`.github/workflows/sonar-tick.yml`](.github/workflows/sonar-tick.yml) is the fallback (GitHub throttles its cron to every few hours).
 
 ## Architecture
 

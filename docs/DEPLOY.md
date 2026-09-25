@@ -1,6 +1,6 @@
 # Deploying Sonar for Panta
 
-Three moving parts: the Next.js app (a Render free web service defined in `render.yaml`, served at https://sonar-panta.nodalytics.xyz), a Redis store (Upstash), and a scheduled tick that refreshes the radar and runs the agent (an external pinger hitting `/api/agent`, with GitHub Actions as fallback). Total cost on free tiers: $0.
+Three moving parts: the Next.js app (a Render free web service defined in `render.yaml`, served at https://sonarpanta.xyz), a Redis store (Upstash), and a scheduled tick that refreshes the radar and runs the agent (an external pinger hitting `/api/agent`, with GitHub Actions as fallback). Total cost on free tiers: $0.
 
 ## 1. Redis (Upstash)
 
@@ -22,8 +22,8 @@ KV_REST_API_URL=... KV_REST_API_TOKEN=... npx tsx scripts/store-sync.ts .sonar-s
 1. Render dashboard → New → Blueprint → pick the GitHub repo. Render reads `render.yaml` and creates the service.
 2. Fill the secret env vars it asks for: `PANTA_API_KEY`, `PANTA_TEST_API_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_SOLANA_RPC` (and `ANTHROPIC_API_KEY` if you want Claude drafting). The non-secret ones are in the blueprint.
 3. First deploy takes about five minutes. Check `https://<service>.onrender.com/api/health`.
-4. Custom domain. Render service → Settings → Custom Domains → add `sonar-panta.nodalytics.xyz`. In Cloudflare DNS for `nodalytics.xyz` add a CNAME record: name `sonar-panta`, target `sonar-panta.onrender.com`, proxy **off** (DNS only) so Render can issue the certificate. Render verifies within a few minutes and serves HTTPS. `NEXT_PUBLIC_SITE_URL` in the blueprint already points at this hostname.
-5. Point the pinger (section 3a) at `https://sonar-panta.nodalytics.xyz/api/agent`.
+4. Custom domain. Register `sonarpanta.xyz` (Cloudflare Registrar or Porkbun; .xyz is a few dollars the first year) and put its DNS on Cloudflare. Render service → Settings → Custom Domains → add `sonarpanta.xyz` and `www.sonarpanta.xyz`. In Cloudflare DNS add: an **A** record, name `@`, value `216.24.57.1` (Render's apex address), and a **CNAME**, name `www`, target `sonar-panta.onrender.com`; both with the proxy **off** (DNS only) so Render can issue the certificates. Render verifies within a few minutes and serves HTTPS on both; `www` redirects to the apex. `NEXT_PUBLIC_SITE_URL` in the blueprint already points at this hostname.
+5. Point the pinger (section 3a) at `https://sonarpanta.xyz/api/agent`.
 
 Render redeploys on every push to `main` (`autoDeploy: true`).
 
@@ -37,7 +37,7 @@ The route answers `202` immediately and finishes the tick in the background (`wa
 
 | Field | Value |
 | --- | --- |
-| URL | `https://sonar-panta.nodalytics.xyz/api/agent` |
+| URL | `https://sonarpanta.xyz/api/agent` |
 | Method | `POST` |
 | Header | `Authorization: Bearer <CRON_SECRET>` |
 | Schedule | every 10 minutes |
@@ -45,7 +45,7 @@ The route answers `202` immediately and finishes the tick in the background (`wa
 Check it by hand:
 
 ```bash
-curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://sonar-panta.nodalytics.xyz/api/agent
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://sonarpanta.xyz/api/agent
 # {"ok":true,"started":true,"runs":18}   then /api/health shows a fresh radarUpdatedAt ~90 s later
 ```
 
@@ -66,7 +66,7 @@ Set the repository variable `SONAR_AGENT_MODE=live` plus a secret `SONAR_AGENT_K
 ## 4. Check
 
 ```bash
-curl https://sonar-panta.nodalytics.xyz/api/health
+curl https://sonarpanta.xyz/api/health
 # {"ok":true,"store":"redis","panta":"ok:active","radarMarkets":64,...}
 ```
 
