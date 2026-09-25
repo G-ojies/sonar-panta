@@ -1,0 +1,39 @@
+# Render blueprint: one free web service running `next start`. A long-lived Node process, so the
+# agent tick (POST /api/agent) finishes in-process with no function time limit, and the 10-minute
+# pinger that drives it also keeps the free instance from sleeping.
+services:
+  - type: web
+    name: sonar-panta
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: PANTA_API_BASE_URL
+        value: https://live-api.panta.market/api/v1
+      - key: NEXT_PUBLIC_SOLANA_CLUSTER
+        value: mainnet-beta
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://sonar-panta.onrender.com
+      - key: SONAR_AGENT_MODE
+        value: paper
+      # set in the Render dashboard (sync: false = never written to the blueprint)
+      - key: PANTA_API_KEY
+        sync: false
+      - key: PANTA_TEST_API_KEY
+        sync: false
+      - key: KV_REST_API_URL
+        sync: false
+      - key: KV_REST_API_TOKEN
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_SOLANA_RPC
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

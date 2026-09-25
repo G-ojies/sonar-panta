@@ -8,6 +8,7 @@ import { marketUrl } from '@/lib/panta-public';
 import { postJson } from './useApi';
 import { WalletButton } from './WalletButton';
 import { PoweredByPanta } from './PoweredByPanta';
+import { Masthead } from './Desk';
 import { useSandbox } from './useSandbox';
 
 /** Read-only address used when sandbox mode is on and no wallet is connected: Panta's fixtures accept any pubkey and nothing is signed. */
@@ -99,13 +100,7 @@ export function CreateFlow() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Create a market</h1>
-          <p className="mt-1 max-w-2xl text-sm text-fog">Paste a headline, a question or a URL. Sonar drafts a resolvable YES/NO market; you edit it, Panta quotes the fee, your wallet signs. Creators earn fees on every trade their market attracts.</p>
-        </div>
-        <PoweredByPanta />
-      </header>
+      <Masthead kicker="Create" title="Turn a headline into a market Panta can resolve." note="Paste a headline, a question or a URL. Sonar drafts a YES/NO market with a rule that can actually be settled; you edit it, Panta quotes the fee, your wallet signs. Creators earn a share of every trade their market attracts." aside={<PoweredByPanta />} />
 
       <section className="panel p-4">
         <label htmlFor="in" className="label">Headline, question or URL</label>

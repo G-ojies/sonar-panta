@@ -47,11 +47,10 @@ export function MarketView({ id }: { id: string }) {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="YES" value={cents(yesPrice)} tone="yes" />
-            <Stat label="NO" value={cents(yesPrice === null ? null : 1 - yesPrice)} tone="no" />
-            <Stat label="Volume" value={usd(d.totalVolumeUsdc ?? d.volumeUsdc, 0)} />
-            <Stat label="Prints" value={String(oc?.totalTrades ?? tape.length)} />
+          <section className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-line pb-4">
+            <div><span className="text-xs text-fog-2">YES</span> <span className="mono ml-2 text-3xl font-semibold text-yes">{cents(yesPrice)}</span></div>
+            <div><span className="text-xs text-fog-2">NO</span> <span className="mono ml-2 text-3xl font-semibold text-no">{cents(yesPrice === null ? null : 1 - yesPrice)}</span></div>
+            <p className="text-sm text-fog sm:ml-auto"><span className="mono text-paper">{usd(d.totalVolumeUsdc ?? d.volumeUsdc, 0)}</span> traded across <span className="mono text-paper">{oc?.totalTrades ?? tape.length}</span> prints</p>
           </section>
 
           <section className="panel p-4">
@@ -62,12 +61,17 @@ export function MarketView({ id }: { id: string }) {
               <ScoreBar score={s.score} />
               <span className="ml-auto text-xs text-fog-2">24h <Sparkline snaps={data.snapshots} /></span>
             </div>
-            {s.reasons.length > 0 && (
-              <ul className="mt-3 space-y-1 text-sm text-fog">
-                {s.reasons.map((r) => <li key={r} className="flex gap-2"><span className="text-ping" aria-hidden>›</span>{r}</li>)}
+            <p className="mt-3 text-sm leading-relaxed text-paper">
+              {s.side === 'FLAT'
+                ? <>Sonar reads this market flat{s.reasons[0] ? <>: {s.reasons[0]}</> : ''}. No call until the tape says something.</>
+                : <>Sonar leans <span className={s.side === 'YES' ? 'text-yes' : 'text-no'}>{s.side}</span> with {s.confidence} confidence, score {s.score}.</>}
+            </p>
+            {s.reasons.length > (s.side === 'FLAT' ? 1 : 0) && (
+              <ul className="mt-2 space-y-1 text-sm text-fog">
+                {s.reasons.slice(s.side === 'FLAT' ? 1 : 0).map((r) => <li key={r} className="flex gap-2"><span className="text-ping" aria-hidden>›</span>{r}</li>)}
               </ul>
             )}
-            <dl className="mono mt-4 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-fog sm:grid-cols-3">
+            <dl className="mono mt-4 grid grid-cols-2 gap-x-6 gap-y-3 text-xs text-fog sm:grid-cols-3">
               <Row k="flow imbalance" v={`${s.flowImbalance >= 0 ? '+' : ''}${(s.flowImbalance * 100).toFixed(0)}%`} />
               <Row k="momentum 24h" v={s.momentum === null ? '—' : `${s.momentum >= 0 ? '+' : ''}${(s.momentum * 100).toFixed(1)}pts`} />
               <Row k="largest print" v={`${(s.whaleShare * 100).toFixed(0)}% of tape`} />
@@ -127,21 +131,13 @@ export function MarketView({ id }: { id: string }) {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'yes' | 'no' }) {
-  return (
-    <div className="panel px-4 py-3">
-      <div className="text-xs uppercase tracking-wide text-fog-2">{label}</div>
-      <div className={`mono mt-1 text-2xl font-semibold ${tone === 'yes' ? 'text-yes' : tone === 'no' ? 'text-no' : ''}`}>{value}</div>
-    </div>
-  );
-}
-function Row({ k, v }: { k: string; v: string }) { return <><dt className="text-fog-2">{k}</dt><dd className="text-paper">{v}</dd></>; }
+function Row({ k, v }: { k: string; v: string }) { return <div><dt className="text-fog-2">{k}</dt><dd className="mt-0.5 text-paper">{v}</dd></div>; }
 
 function MarketSkeleton() {
   return (
     <div className="space-y-6" aria-busy="true" aria-label="Loading market">
       <div className="skeleton h-4 w-32" /><div className="skeleton h-7 w-2/3" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="skeleton h-20" />)}</div>
+      <div className="skeleton h-10 w-1/2" />
       <div className="skeleton h-40" /><div className="skeleton h-24" />
     </div>
   );

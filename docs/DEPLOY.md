@@ -1,6 +1,6 @@
 # Deploying Sonar for Panta
 
-Three moving parts: the Next.js app (Vercel), a Redis store (Upstash), and a scheduled tick that refreshes the radar and runs the agent (an external pinger hitting `/api/agent`, with GitHub Actions as fallback). Total cost on free tiers: $0.
+Three moving parts: the Next.js app (Render free web service, `render.yaml`; Vercel also works), a Redis store (Upstash), and a scheduled tick that refreshes the radar and runs the agent (an external pinger hitting `/api/agent`, with GitHub Actions as fallback). Total cost on free tiers: $0.
 
 ## 1. Redis (Upstash)
 
@@ -14,6 +14,18 @@ Seed it with the history collected locally so the deployment does not start empt
 ```bash
 KV_REST_API_URL=... KV_REST_API_TOKEN=... npx tsx scripts/store-sync.ts .sonar-store.json
 ```
+
+## 1b. Hosting on Render (current production)
+
+`render.yaml` at the repo root is a Render Blueprint: one free web service running `next start`. Because it is a long-lived Node process there is no function time limit, so the 90-second tick behind `POST /api/agent` simply runs to completion, and the same 10-minute pinger that drives it keeps the free instance from sleeping.
+
+1. Render dashboard → New → Blueprint → pick the GitHub repo. Render reads `render.yaml` and creates the service.
+2. Fill the secret env vars it asks for: `PANTA_API_KEY`, `PANTA_TEST_API_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_SOLANA_RPC` (and `ANTHROPIC_API_KEY` if you want Claude drafting). The non-secret ones are in the blueprint.
+3. First deploy takes about five minutes. Check `https://<service>.onrender.com/api/health`.
+4. Point the pinger (section 3a) at the Render URL and update `NEXT_PUBLIC_SITE_URL` if the service name differs from `sonar-panta`.
+5. If a Vercel deployment still exists, turn it into a redirect so old links keep working: `vercel.json` `"redirects": [{ "source": "/(.*)", "destination": "https://<service>.onrender.com/$1", "permanent": false }]`, then `npx vercel --prod` once more.
+
+Render redeploys on every push to `main` (`autoDeploy: true`).
 
 ## 2. Vercel
 

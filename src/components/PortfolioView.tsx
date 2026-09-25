@@ -8,6 +8,7 @@ import { broadcast, compile, explorerTx } from '@/lib/solana';
 import { postJson, useApi } from './useApi';
 import { WalletButton } from './WalletButton';
 import { PoweredByPanta } from './PoweredByPanta';
+import { Masthead, Strip } from './Desk';
 import { useSandbox } from './useSandbox';
 
 type Row = Position & { title: string; yesPrice: number | null; value: number | null; endTime: number | null };
@@ -43,13 +44,7 @@ export function PortfolioView() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Portfolio</h1>
-          <p className="mt-1 text-sm text-fog">Your Panta positions, marked to the live YES/NO price. Claim winnings straight from here.</p>
-        </div>
-        <PoweredByPanta />
-      </header>
+      <Masthead kicker="Portfolio" title="Your Panta positions, marked to the live YES and NO price." note="Claim winnings from here. A claim is a transaction like any other: Panta builds it, your wallet signs it." aside={<PoweredByPanta />} />
 
       {!wallet ? (
         <div className="panel flex flex-col items-center gap-3 p-10 text-center text-sm text-fog">
@@ -65,12 +60,12 @@ export function PortfolioView() {
         </div>
       ) : data && (
         <>
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat label="Mark-to-market" value={usd(data.positions.reduce((a, r) => a + (r.value ?? 0), 0))} />
-            <Stat label="Contributed" value={usd(data.summary?.primaryContributedUsdc ?? 0)} />
-            <Stat label="Open" value={String(data.positions.filter((r) => !r.outcome).length)} />
-            <Stat label="Claimable" value={String(data.positions.filter((r) => r.claimable && !r.claimed).length)} />
-          </section>
+          <Strip items={[
+            { k: 'mark-to-market', v: usd(data.positions.reduce((a, r) => a + (r.value ?? 0), 0)) },
+            { k: 'contributed', v: usd(data.summary?.primaryContributedUsdc ?? 0) },
+            { k: 'open', v: data.positions.filter((r) => !r.outcome).length },
+            { k: 'claimable', v: data.positions.filter((r) => r.claimable && !r.claimed).length, tone: data.positions.some((r) => r.claimable && !r.claimed) ? 'ping' : undefined },
+          ]} />
           <section className="panel overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-fog-2"><tr className="border-b border-line">
@@ -96,7 +91,4 @@ export function PortfolioView() {
       )}
     </div>
   );
-}
-function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="panel px-4 py-3"><div className="text-xs uppercase tracking-wide text-fog-2">{label}</div><div className="mono mt-1 text-2xl font-semibold">{value}</div></div>;
 }

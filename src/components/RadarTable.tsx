@@ -35,30 +35,29 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
   ];
 
   return (
-    <section className="panel overflow-hidden">
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-        <div role="tablist" aria-label="Filter markets" className="flex gap-1">
+    <section>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-line pb-2">
+        <div role="tablist" aria-label="Filter markets" className="flex gap-5 overflow-x-auto whitespace-nowrap">
           {tabs.map((t) => (
-            <button key={t.k} role="tab" aria-selected={filter === t.k} onClick={() => setFilter(t.k)}
-              className={`h-9 rounded-md px-3 text-sm ${filter === t.k ? 'bg-ink-3 text-paper' : 'text-fog hover:text-paper'}`}>
+            <button key={t.k} role="tab" aria-selected={filter === t.k} onClick={() => setFilter(t.k)} className="filter">
               {t.label} <span className="mono ml-1 text-[11px] text-fog-2">{counts[t.k]}</span>
             </button>
           ))}
         </div>
         <label className="ml-auto flex items-center gap-2 text-xs text-fog">
           <span className="sr-only">Search markets</span>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search question…" className="field h-9 w-56" type="search" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a question" className="field h-9 w-56" type="search" />
         </label>
       </div>
 
       {rows.length === 0 ? (
-        <div className="p-8 text-center text-sm text-fog">
-          {filter === 'tradable' ? 'No market is in its primary buy window right now. Panta opens new breaking markets through the day; the agent keeps watching.' : 'Nothing matches this filter.'}
-        </div>
+        <p className="max-w-xl py-8 text-sm leading-relaxed text-fog">
+          {filter === 'tradable' ? 'No market is in its primary buy window right now. Panta opens new breaking markets through the day, and the agent keeps watching.' : filter === 'matched' ? 'None of the open questions trades on Polymarket or Kalshi at the moment. The matcher only pairs questions that share a subject, so it reports nothing rather than a wrong match.' : 'No market matches that. Try another filter, or clear the search.'}
+        </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-fog-2">
+            <thead className="text-left text-[11px] uppercase tracking-wide text-fog-2">
               <tr className="border-b border-line">
                 <th className="px-3 py-2 font-medium">Market</th>
                 <th className="px-3 py-2 font-medium">Panta YES</th>
@@ -74,9 +73,9 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
                 const d = m.detail; const s = m.signals;
                 const title = d.title || d.question || d.onChain?.question || d.marketId;
                 return (
-                  <tr key={d.marketId} className="border-b border-line/60 hover:bg-ink-3/40">
-                    <td className="max-w-md px-3 py-2">
-                      <Link href={`/market/${d.marketId}`} className="block truncate text-paper no-underline hover:underline" title={title}>{title}</Link>
+                  <tr key={d.marketId} className="border-b border-line/60 transition-colors duration-150 hover:bg-ink-2">
+                    <td className="max-w-md px-3 py-2.5">
+                      <Link href={`/market/${d.marketId}`} className="block truncate font-medium text-paper no-underline hover:underline" title={title}>{title}</Link>
                       <div className="mt-0.5 flex items-center gap-2 text-[11px] text-fog-2">
                         <span className="uppercase">{d.category}</span>
                         <span>·</span>
@@ -93,7 +92,7 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
                             <span className={`ml-1 text-[11px] ${s.crossVenueGap > 0 ? 'text-yes' : 'text-no'}`}>{s.crossVenueGap > 0 ? '+' : ''}{Math.round(s.crossVenueGap * 100)}</span>
                           )}
                         </a>
-                      ) : <span className="text-fog-2">—</span>}
+                      ) : <span className="text-[11px] text-fog-2">only on Panta</span>}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2"><SideChip side={s.side} score={s.score} /><ConfidenceDots level={s.confidence} /></div>

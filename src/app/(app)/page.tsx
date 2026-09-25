@@ -1,8 +1,9 @@
 import { readRadar, readRefreshLog } from '@/lib/radar';
 import { readBacktest } from '@/lib/backtest';
 import { RadarTable } from '@/components/RadarTable';
-import { ago } from '@/lib/format';
-import Link from 'next/link';
+import { Masthead, Strip, agoWords, cap, plural, words } from '@/components/Desk';
+import { Sweep } from '@/components/Sweep';
+import type { StripItem } from '@/components/Desk';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,57 +15,52 @@ export default async function RadarPage() {
   const open = markets.filter((m) => m.detail.onChain?.isActive).length;
   const matched = markets.filter((m) => m.venue).length;
   const calls = markets.filter((m) => m.signals.side !== 'FLAT' && m.detail.phase !== 'resolved').length;
+  const resolved = markets.filter((m) => m.detail.phase === 'resolved').length;
+  const last = log[0];
 
-  return (
-    <div className="space-y-6">
-      <section className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Radar</h1>
-          <p className="mt-1 max-w-2xl text-sm text-fog">
-            Every Panta market the API exposes, scored from its own trade tape and priced against Polymarket and Kalshi.
-            Positive score leans YES, negative leans NO.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-fog-2">
-          <span className="ping-dot" aria-hidden />
-          {radar ? <span>scan {ago(now - radar.updatedAt)} ago · {radar.scanned} rows · {radar.durationMs ? `${(radar.durationMs / 1000).toFixed(0)}s` : ''}</span> : <span>radar has not run yet</span>}
-          {log[0]?.errors ? <span className="text-amber">· {log[0].errors} API errors</span> : null}
-          {log[0]?.skipped ? <span title="Panta answered with a stripped row and nothing is cached; retried next scan">· {log[0].skipped} stripped rows skipped</span> : null}
-        </div>
-      </section>
+  // The opening line is written from the numbers, so it says what the desk actually sees right now.
+  const title = !radar
+    ? 'The radar has not run yet.'
+    : open === 0
+      ? 'Nothing is open on Panta right now.'
+      : `${cap(words(open))} ${plural(open, 'market is', 'markets are')} open on Panta right now.` +
+        (calls > 0
+          ? ` ${cap(words(calls))} ${plural(calls, 'carries', 'carry')} a Sonar call.`
+          : ' None of them has enough tape for a read yet.') +
+        (matched > 0 ? ` ${cap(words(matched))} also ${plural(matched, 'trades', 'trade')} on Polymarket or Kalshi.` : '');
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Open on-chain" value={open} hint="isActive from Panta detail" />
-        <Stat label="Tradable now" value={live} hint="primary phase, buys accepted" />
-        <Stat label="Cross-venue matches" value={matched} hint="same question found elsewhere" />
-        <Stat label="Active calls" value={calls} hint="non-flat Sonar signals" />
-      </section>
-
-      {bt && bt.calls > 0 && (
-        <section className="panel flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 text-sm">
-          <span className="font-medium">Backtest on resolved Panta markets</span>
-          <span className="mono text-fog">{bt.markets} markets · {bt.calls} calls · <span className="text-paper">{bt.hits} hit</span> ({bt.hitRate !== null ? Math.round(bt.hitRate * 100) : 0}%) · {bt.flat} flat</span>
-          <Link href="/agent" className="ml-auto text-xs">see the agent’s record →</Link>
-        </section>
-      )}
-
-      {!radar ? (
-        <div className="panel p-8 text-center text-sm text-fog">
-          Radar is empty. Run <code className="mono text-paper">npm run snapshot</code> or hit <code className="mono text-paper">/api/refresh</code>.
-        </div>
-      ) : (
-        <RadarTable markets={markets} now={now} />
-      )}
-    </div>
+  const note = radar ? (
+    <>
+      Last scan {agoWords(now - radar.updatedAt)} ago: {radar.scanned} rows in {radar.durationMs ? `${Math.round(radar.durationMs / 1000)} seconds` : 'a moment'}.
+      {last?.skipped ? ` ${last.skipped} came back stripped from Panta and were skipped.` : ''}
+      {last?.errors ? <span className="text-amber"> {last.errors} {plural(last.errors, 'call', 'calls')} to the Panta API failed.</span> : null}
+      {resolved > 0 ? ` Behind the open markets sit ${resolved} resolved ones, four months of history the backtest and the agent settle against.` : ''}
+      {' '}Every market is scored from its own trade tape and priced against Polymarket and Kalshi. Positive leans YES, negative leans NO.
+    </>
+  ) : (
+    <>Run <code className="mono text-paper">npm run snapshot</code> or POST <code className="mono text-paper">/api/agent</code> to take the first scan.</>
   );
-}
 
-function Stat({ label, value, hint }: { label: string; value: number | string; hint: string }) {
+  const strip: StripItem[] = [
+    { k: 'open on-chain', v: open, title: 'isActive on the Panta detail row' },
+    { k: 'tradable now', v: live, tone: live ? 'ping' : undefined, title: 'primary phase, buys accepted' },
+    { k: 'on other venues', v: matched, title: 'same question found on Polymarket or Kalshi' },
+    { k: 'Sonar calls', v: calls, tone: calls ? 'ping' : undefined, title: 'non-flat signals on open markets' },
+    { k: 'resolved history', v: resolved },
+  ];
+  if (bt && bt.calls > 0) strip.push({ k: 'backtest', v: `${bt.hits} of ${bt.calls} hit`, tone: bt.hitRate !== null && bt.hitRate >= 0.5 ? 'yes' : 'no', href: '/agent', title: `${bt.markets} resolved markets replayed from the first 60% of each tape` });
+
   return (
-    <div className="panel px-4 py-3">
-      <div className="text-xs uppercase tracking-wide text-fog-2">{label}</div>
-      <div className="mono mt-1 text-2xl font-semibold">{value}</div>
-      <div className="text-xs text-fog-2">{hint}</div>
+    <div className="space-y-8">
+      <Masthead kicker="Radar" title={title} note={note} aside={<Sweep blips={open} />}>
+        <Strip items={strip} className="mt-6" />
+      </Masthead>
+
+      {radar ? (
+        <RadarTable markets={markets} now={now} />
+      ) : (
+        <p className="text-sm text-fog">Nothing to show until the first scan lands.</p>
+      )}
     </div>
   );
 }

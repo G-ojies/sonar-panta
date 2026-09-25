@@ -4,6 +4,7 @@ import type { BacktestSummary } from '@/lib/backtest';
 import { ago, cents, usd } from '@/lib/format';
 import { explorerTx } from '@/lib/solana';
 import { PoweredByPanta } from './PoweredByPanta';
+import { Masthead, Strip, cap, plural, words } from './Desk';
 
 type Summary = ReturnType<typeof import('@/lib/agent').summarize>;
 
@@ -11,24 +12,25 @@ export function AgentView({ state, summary, backtest }: { state: AgentState | nu
   const now = Date.now() / 1000;
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Agent</h1>
-          <p className="mt-1 max-w-2xl text-sm text-fog">Sonar runs unattended: rescans the Panta catalog, takes a paper position on every non-flat call (live mode needs medium confidence or better), and settles it when Panta resolves the market.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {state && <span className="text-xs text-fog-2"><span className="ping-dot mr-2" aria-hidden />{state.mode} · run #{state.runs} · {ago(now - state.lastRunAt)} ago</span>}
+      <Masthead
+        kicker="Agent"
+        title={!state
+          ? 'The agent has not run yet.'
+          : `${cap(state.mode)} mode, ${state.runs} ${plural(state.runs, 'run')} so far: ${words(summary.open)} open ${plural(summary.open, 'position')}, ${summary.closed === 0 ? 'none' : words(summary.closed)} settled.`}
+        note="Sonar runs unattended: it rescans the Panta catalog, takes a paper position on every non-flat call (live mode needs medium confidence or better), and settles it when Panta resolves the market. Every call, its reason and its result are on this page, so the record speaks before the slides do."
+        aside={<div className="flex items-center gap-3">
+          {state && <span className="text-xs text-fog-2"><span className="ping-dot mr-2" aria-hidden />last run {ago(now - state.lastRunAt)} ago</span>}
           <PoweredByPanta />
-        </div>
-      </header>
+        </div>}
+      />
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <Stat label="Open" value={String(summary.open)} />
-        <Stat label="Settled" value={String(summary.closed)} />
-        <Stat label="Hit rate" value={summary.hitRate === null ? '—' : `${Math.round(summary.hitRate * 100)}%`} tone={summary.hitRate === null ? undefined : summary.hitRate >= 0.5 ? 'yes' : 'no'} />
-        <Stat label="P&L" value={usd(summary.pnl)} tone={summary.pnl > 0 ? 'yes' : summary.pnl < 0 ? 'no' : undefined} />
-        <Stat label="Staked" value={usd(summary.staked)} />
-      </section>
+      <Strip items={[
+        { k: 'open', v: summary.open },
+        { k: 'settled', v: summary.closed },
+        { k: 'hit rate', v: summary.hitRate === null ? 'not yet' : `${Math.round(summary.hitRate * 100)}%`, tone: summary.hitRate === null ? undefined : summary.hitRate >= 0.5 ? 'yes' : 'no' },
+        { k: 'P&L', v: usd(summary.pnl), tone: summary.pnl > 0 ? 'yes' : summary.pnl < 0 ? 'no' : undefined },
+        { k: 'staked', v: usd(summary.staked) },
+      ]} />
 
       {!state ? (
         <div className="panel p-8 text-center text-sm text-fog">The agent has not run yet. Run <code className="mono text-paper">npm run agent</code> or POST <code className="mono text-paper">/api/agent</code>.</div>
@@ -87,7 +89,4 @@ export function AgentView({ state, summary, backtest }: { state: AgentState | nu
       )}
     </div>
   );
-}
-function Stat({ label, value, tone }: { label: string; value: string; tone?: 'yes' | 'no' }) {
-  return <div className="panel px-4 py-3"><div className="text-xs uppercase tracking-wide text-fog-2">{label}</div><div className={`mono mt-1 text-2xl font-semibold ${tone === 'yes' ? 'text-yes' : tone === 'no' ? 'text-no' : ''}`}>{value}</div></div>;
 }
