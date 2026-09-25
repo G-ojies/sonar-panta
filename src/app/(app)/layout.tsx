@@ -36,8 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <footer className="mx-auto max-w-[1400px] px-4 pb-8 pt-4 sm:px-6 sm:pb-24">
         <div className="grid gap-4 border-t border-line pt-6 text-xs text-fog-2 sm:grid-cols-12">
           <p className="max-w-md leading-relaxed sm:col-span-7">
-            Built in Benin City by <span className="text-fog">GreYat Labs</span>. Sonar is analytics, not advice.
-            Trades are non-custodial: nothing moves unless you sign it in your own wallet.
+            Sonar is analytics, not advice. Trades are non-custodial: nothing moves unless you sign it in your own wallet.
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:col-span-5 sm:justify-end">
             <Link href="/pitch" className="text-fog-2 no-underline hover:text-paper">Pitch</Link>

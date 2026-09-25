@@ -9,7 +9,8 @@ const mono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', displ
 export const metadata: Metadata = {
   title: 'Sonar for Panta',
   description: 'Behavioural signals, cross-venue pricing and one-click non-custodial trading for Panta prediction markets on Solana.',
-  icons: { icon: '/icon.svg', apple: '/apple-icon.png' },
+  // versioned so browsers that cached the old favicon fetch the new mark
+  icons: { icon: [{ url: '/favicon.ico?v=3', sizes: '48x48' }, { url: '/icon.svg?v=3', type: 'image/svg+xml' }], shortcut: '/favicon.ico?v=3', apple: '/apple-icon.png?v=3' },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://sonarpanta.xyz'),
   openGraph: { title: 'Sonar for Panta', description: 'The intelligence layer for on-chain prediction markets. Powered by Panta.', images: ['/screens/radar.png'] },
 };
