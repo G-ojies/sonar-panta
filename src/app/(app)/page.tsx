@@ -44,12 +44,10 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
   return (
     <div className="space-y-6">
       {/* status line */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fog-2">
-        <span className="ping-dot" aria-hidden />
-        {radar ? <span>scan {agoWords(now - radar.updatedAt)} ago · {radar.scanned} rows</span> : <span>no scan yet</span>}
-        {last?.skipped ? <span>· {last.skipped} stripped rows skipped</span> : null}
-        {last?.errors ? <span className="text-amber">· {last.errors} API errors</span> : null}
-        <span className="hidden sm:inline">· Positive score leans YES, negative leans NO</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fog-2">
+        <span className="dot-live" aria-hidden />
+        {radar ? <span>Live from Panta · updated {agoWords(now - radar.updatedAt)} ago · {radar.scanned} markets scanned</span> : <span>Waiting for the first scan</span>}
+        {last?.errors ? <span className="text-amber">· {last.errors} API {plural(last.errors, 'call', 'calls')} failed</span> : null}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">

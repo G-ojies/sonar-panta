@@ -83,6 +83,9 @@
   @keyframes sweep-blip { 0% { opacity: 1; } 70% { opacity: 0.3; } 100% { opacity: 1; } }
 }
 
+/* a still green dot with a soft halo: says live without blinking */
+.dot-live { display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: theme('colors.yes'); box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.18); }
+
 /* live "ping" ring — decorative, disabled under reduced motion */
 .ping-dot { position: relative; display: inline-block; width: 8px; height: 8px; border-radius: 9999px; background: theme('colors.ping.DEFAULT'); }
 .ping-dot::after { content: ''; position: absolute; inset: -4px; border-radius: 9999px; border: 1px solid theme('colors.ping.DEFAULT'); opacity: 0; }
