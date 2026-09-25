@@ -56,7 +56,7 @@ export function MarketView({ id }: { id: string }) {
                 <p className="text-sm text-fog"><span className="mono text-paper">{usd(d.totalVolumeUsdc ?? d.volumeUsdc, 0)}</span> traded across <span className="mono text-paper">{oc?.totalTrades ?? tape.length}</span> prints</p>
               </div>
               <div className="lg:col-span-3">
-                <LiveChart marketId={d.marketId} snaps={data.snapshots} height={260} fill />
+                <LiveChart marketId={d.marketId} snaps={data.snapshots} height={210} />
               </div>
             </div>
           </section>

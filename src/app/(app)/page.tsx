@@ -54,11 +54,11 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
         {last && (last.errors >= 5 || (radar && now - radar.updatedAt > 1800 && last.errors > 0)) ? <span className="text-amber">· {last.errors} API {plural(last.errors, 'call', 'calls')} failed on the last scan</span> : null}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-3 xl:items-start">
         {/* hero card */}
         <section className="card xl:col-span-2">
           {hero ? (
-            <div className="grid h-full gap-6 p-5 sm:p-6 lg:grid-cols-5">
+            <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-5">
               <div className="space-y-5 lg:col-span-2">
                 <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-fog-2">
                   <span className="pill">{hero.detail.category || 'market'}</span>
@@ -84,7 +84,7 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
                 <Link href={`/market/${hero.detail.marketId}`} className="btn btn-primary w-full sm:w-auto">Open market</Link>
               </div>
               <div className="flex flex-col lg:col-span-3">
-                <LiveChart marketId={hero.detail.marketId} snaps={snaps} height={330} poll fill />
+                <LiveChart marketId={hero.detail.marketId} snaps={snaps} height={330} poll />
               </div>
             </div>
           ) : (
