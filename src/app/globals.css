@@ -62,7 +62,7 @@
 .sweep { color: theme('colors.ping.DEFAULT'); width: min(176px, 40vw); height: auto; }
 
 /* the live strip along the bottom */
-.ticker { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; display: flex; align-items: center; height: 40px; border-top: 1px solid theme('colors.line'); background: rgba(11,12,20,0.92); backdrop-filter: blur(8px); font-size: 12px; }
+.ticker { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; align-items: center; height: 40px; border-top: 1px solid theme('colors.line'); background: rgba(11,12,20,0.92); backdrop-filter: blur(8px); font-size: 12px; }
 .ticker-live { display: inline-flex; align-items: center; gap: 8px; height: 100%; padding: 0 14px; border-right: 1px solid theme('colors.line'); color: theme('colors.yes'); font-weight: 600; letter-spacing: 0.08em; font-size: 11px; flex: none; }
 .ticker-track { display: flex; flex: 1; min-width: 0; overflow: hidden; }
 .ticker-row { display: flex; flex: none; align-items: center; gap: 28px; padding: 0 14px; white-space: nowrap; }
@@ -70,7 +70,7 @@
 .ticker-item:hover { text-decoration: none; }
 .ticker-item:hover span:nth-child(3) { text-decoration: underline; }
 @media (prefers-reduced-motion: no-preference) {
-  .ticker-row { animation: ticker-scroll 60s linear infinite; }
+  .ticker-row { animation: ticker-scroll 90s linear infinite; }
   .ticker-track:hover .ticker-row { animation-play-state: paused; }
   @keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 }

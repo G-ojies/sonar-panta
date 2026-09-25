@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { RadarMarket } from '@/lib/types';
 import { usd } from '@/lib/format';
+import { TickerShell } from './TickerShell';
 
 /** The live strip along the bottom: recent resolutions and the busiest open markets, looping. */
 export function Ticker({ markets }: { markets: RadarMarket[] }) {
@@ -16,7 +17,8 @@ export function Ticker({ markets }: { markets: RadarMarket[] }) {
     .slice(0, 6)
     .map((m) => ({ id: m.detail.marketId, q: m.detail.title || m.detail.question || '', tag: `YES ${Math.round((m.yesPrice ?? 0.5) * 100)}¢`, tone: 'text-ping', extra: `${usd(m.detail.totalVolumeUsdc ?? m.detail.volumeUsdc, 0)} vol` }));
   const items = [...open, ...resolved];
-  if (items.length === 0) return null;
+  // nothing to loop is worse than no strip: below four items the bar just repeats itself
+  if (items.length < 4) return null;
   const row = (k: string) => (
     <div className="ticker-row" aria-hidden={k === 'b'}>
       {items.map((it, i) => (
@@ -30,9 +32,9 @@ export function Ticker({ markets }: { markets: RadarMarket[] }) {
     </div>
   );
   return (
-    <div className="ticker" role="region" aria-label="Live markets">
+    <TickerShell>
       <span className="ticker-live"><span className="ping-dot" aria-hidden /> LIVE</span>
       <div className="ticker-track">{row('a')}{row('b')}</div>
-    </div>
+    </TickerShell>
   );
 }
