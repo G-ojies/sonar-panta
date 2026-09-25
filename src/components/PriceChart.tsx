@@ -4,10 +4,10 @@ import type { Snapshot } from '@/lib/types';
  * YES and NO price over time from Sonar's own snapshots. YES in blue, NO in violet,
  * end labels like a trading terminal. Pure SVG, no client code.
  */
-export function PriceChart({ snaps, height = 220, className = '' }: { snaps: Snapshot[]; height?: number; className?: string }) {
+export function PriceChart({ snaps, height = 220, className = '', live = false }: { snaps: Snapshot[]; height?: number; className?: string; live?: boolean }) {
   const pts = snaps.filter((s) => s.yesPrice !== null).map((s) => ({ t: s.ts, y: s.yesPrice as number }));
   // 420 wide: the chart sits in a column about that wide on desktop, so text renders near 1:1
-  const W = 420, H = height, padR = 52, padL = 8, padT = 16, padB = 28;
+  const W = 420, H = height, padR = 48, padL = 8, padT = 16, padB = 28;
   if (pts.length < 2) {
     return (
       <div className={`flex items-center justify-center rounded-xl border border-dashed border-line text-center text-xs text-fog-2 ${className}`} style={{ height }}>
@@ -33,15 +33,11 @@ export function PriceChart({ snaps, height = 220, className = '' }: { snaps: Sna
           <stop offset="1" stopColor="#5b8def" stopOpacity="0" />
         </linearGradient>
       </defs>
-      {[0.25, 0.5, 0.75].map((g) => (
-        <g key={g}>
-          <line x1={padL} x2={W - padR} y1={y(g)} y2={y(g)} stroke="#262a3a" strokeDasharray="3 5" />
-          <text x={W - padR + 8} y={y(g) + 4} fontSize="13" fill="#6a7288" fontFamily="var(--font-mono)">{Math.round(g * 100)}%</text>
-        </g>
-      ))}
+      {[0.25, 0.5, 0.75].map((g) => <line key={g} x1={padL} x2={W - padR} y1={y(g)} y2={y(g)} stroke="#262a3a" strokeDasharray="3 5" />)}
       <path d={`${yes} L${x(last.t).toFixed(1)},${y(0)} L${x(pts[0].t).toFixed(1)},${y(0)} Z`} fill="url(#yes-fill)" />
-      <path d={no} fill="none" stroke="#a78bfa" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
-      <path d={yes} fill="none" stroke="#5b8def" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" />
+      <path d={no} fill="none" stroke="#a78bfa" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" className={live ? 'chart-line' : ''} />
+      <path d={yes} fill="none" stroke="#5b8def" strokeWidth="2.25" strokeLinejoin="round" strokeLinecap="round" className={live ? 'chart-line' : ''} />
+      {live && <circle cx={x(last.t)} cy={y(last.y)} r="4" fill="#5b8def" className="chart-pulse" />}
       <circle cx={x(last.t)} cy={y(last.y)} r="4" fill="#5b8def" />
       <circle cx={x(last.t)} cy={y(1 - last.y)} r="4" fill="#a78bfa" />
       <text x={x(last.t) + 8} y={y(last.y) + 4} fontSize="14" fontWeight="600" fill="#5b8def" fontFamily="var(--font-mono)">{Math.round(last.y * 100)}%</text>

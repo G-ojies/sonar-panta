@@ -7,7 +7,7 @@ import { explorerTx } from '@/lib/solana';
 import { useApi } from './useApi';
 import { ConfidenceDots, ScoreBar, SideChip } from './SignalBadge';
 import { Sparkline } from './Sparkline';
-import { PriceChart } from './PriceChart';
+import { LiveChart } from './LiveChart';
 import { TradePanel } from './TradePanel';
 import { PoweredByPanta } from './PoweredByPanta';
 
@@ -56,11 +56,7 @@ export function MarketView({ id }: { id: string }) {
                 <p className="text-sm text-fog"><span className="mono text-paper">{usd(d.totalVolumeUsdc ?? d.volumeUsdc, 0)}</span> traded across <span className="mono text-paper">{oc?.totalTrades ?? tape.length}</span> prints</p>
               </div>
               <div className="lg:col-span-3">
-                <div className="mb-2 flex items-center justify-between text-xs text-fog-2">
-                  <span className="flex items-center gap-4"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-ping" /> YES</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-violet" /> NO</span></span>
-                  <span>Sonar snapshots, every 10 min</span>
-                </div>
-                <PriceChart snaps={data.snapshots} height={210} />
+                <LiveChart marketId={d.marketId} snaps={data.snapshots} height={210} />
               </div>
             </div>
           </section>

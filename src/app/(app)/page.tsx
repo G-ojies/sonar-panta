@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { readRadar, readRefreshLog, readSnapshots } from '@/lib/radar';
 import { readBacktest } from '@/lib/backtest';
 import { RadarTable } from '@/components/RadarTable';
-import { PriceChart } from '@/components/PriceChart';
+import { LiveChart } from '@/components/LiveChart';
 import { SideChip, ConfidenceDots } from '@/components/SignalBadge';
 import { agoWords, cap, plural, words } from '@/components/Desk';
 import { cents, untilText, usd } from '@/lib/format';
@@ -81,11 +81,7 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
                 <Link href={`/market/${hero.detail.marketId}`} className="btn btn-primary w-full sm:w-auto">Open market</Link>
               </div>
               <div className="flex flex-col lg:col-span-3">
-                <div className="mb-2 flex items-center justify-between text-xs text-fog-2">
-                  <span className="flex items-center gap-4"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-ping" /> YES</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-violet" /> NO</span></span>
-                  <span>Sonar snapshots, every 10 min</span>
-                </div>
-                <PriceChart snaps={snaps} height={330} />
+                <LiveChart marketId={hero.detail.marketId} snaps={snaps} height={330} poll />
               </div>
             </div>
           ) : (
