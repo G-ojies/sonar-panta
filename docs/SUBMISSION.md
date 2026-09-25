@@ -24,7 +24,7 @@ Order of operations: (1) deploy (docs/DEPLOY.md), (2) record the two videos (doc
 - **Project Description:** (same text as the Colosseum description above, then:) Value to the Solana ecosystem: it turns Panta's raw API into a place traders can find an edge, brings off-chain prediction-market flow onto Solana by pricing Panta against Polymarket and Kalshi, and seeds the first Nigerian prediction markets on-chain through the Create flow. Judging criteria mapping: working product live on mainnet (functionality); first intelligence layer over Panta and first Nigerian on-chain markets (novelty, impact); terminal-grade UX with plain-language error handling and non-custodial flows (UX); MIT licensed with a public repo (open source); business plan in docs/BUSINESS-PLAN.md (business plan).
 - **Project Github Link:** https://github.com/G-ojies/sonar-panta
 - **Project Website:** (Vercel URL)
-- **Project X Link:** (launch thread)
+- **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
 - **Link to your pitch deck or Loom/video presentation:** (Vercel URL)/pitch, or the Loom pitch
 - **Did you submit this project to the official Frontier Hackathon on Colosseum? (Yes/No):** Yes (Crypto World's Fair, Solana track, country: Nigeria)
 - **Link to Colosseum project:** (after submitting)
@@ -36,7 +36,7 @@ Order of operations: (1) deploy (docs/DEPLOY.md), (2) record the two videos (doc
 - **Project Description:** (Colosseum description above)
 - **Project Github Link:** https://github.com/G-ojies/sonar-panta
 - **Project Website:** (Vercel URL)
-- **Project X Link:** (launch thread)
+- **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
 - **Pitch deck / Loom:** (Vercel URL)/pitch or Loom
 - **Did you submit to Crypto World's Fair on Colosseum?** Yes
 - **Link to Colosseum project:** (after submitting)
