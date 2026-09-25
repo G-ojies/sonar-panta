@@ -1,6 +1,6 @@
 # Deploying Sonar for Panta
 
-Three moving parts: the Next.js app (Vercel), a Redis store (Upstash), and a scheduled job that refreshes the radar and runs the agent (GitHub Actions). Total cost on free tiers: $0.
+Three moving parts: the Next.js app (Vercel), a Redis store (Upstash), and a scheduled tick that refreshes the radar and runs the agent (an external pinger hitting `/api/agent`, with GitHub Actions as fallback). Total cost on free tiers: $0.
 
 ## 1. Redis (Upstash)
 
@@ -31,18 +31,40 @@ vercel env add ANTHROPIC_API_KEY production        # optional: Claude drafting o
 vercel --prod
 ```
 
-`vercel.json` declares one daily cron (`/api/refresh` at 06:00 UTC) as a fallback: the Hobby plan rejects anything more frequent, so the GitHub Actions job below is the primary scheduler.
+`vercel.json` declares one daily cron (`/api/refresh` at 06:00 UTC) as a last-resort fallback: the Hobby plan rejects anything more frequent.
 
-## 3. Scheduler (GitHub Actions)
+## 3. Scheduler
 
-`.github/workflows/sonar-tick.yml` runs `npm run agent` every 10 minutes: refresh radar (~90 s of rate-limited Panta calls), settle and open paper positions, and re-run the backtest every sixth tick. It writes straight to Upstash, so the Vercel functions stay light.
+One tick = refresh the radar (~90 s of rate-limited Panta calls), settle and open paper positions, and re-run the backtest every sixth tick. It has to run every 10 minutes for the Radar to stay current and the agent's record to grow. Two ways to drive it; use the first.
+
+### 3a. External pinger → `POST /api/agent` (primary)
+
+The route answers `202` immediately and finishes the tick in the background (`waitUntil`), holds a 4-minute lock so overlapping pings are ignored, and needs only `CRON_SECRET`. Any free pinger works; [cron-job.org](https://cron-job.org) is the simplest.
+
+| Field | Value |
+| --- | --- |
+| URL | `https://<project>.vercel.app/api/agent` |
+| Method | `POST` |
+| Header | `Authorization: Bearer <CRON_SECRET>` |
+| Schedule | every 10 minutes |
+
+Check it by hand:
+
+```bash
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://<project>.vercel.app/api/agent
+# {"ok":true,"started":true,"runs":18}   then /api/health shows a fresh radarUpdatedAt ~90 s later
+```
+
+### 3b. GitHub Actions (fallback)
+
+`.github/workflows/sonar-tick.yml` runs `npm run agent` on a `*/10` cron and writes straight to Upstash. **GitHub throttles scheduled workflows on free repositories: in practice this job fires every 3 to 5 hours, not every 10 minutes** (measured 23 to 25 Sep 2026). Keep it as a fallback and for `gh workflow run sonar-tick` on demand.
 
 ```bash
 gh secret set PANTA_API_KEY      --body "pk_live_..."
 gh secret set KV_REST_API_URL    --body "https://....upstash.io"
 gh secret set KV_REST_API_TOKEN  --body "..."
 gh secret set SOLANA_RPC         --body "https://..."      # optional
-gh workflow run sonar-tick                                  # first tick now
+gh workflow run sonar-tick                                  # one tick now
 ```
 
 Set the repository variable `SONAR_AGENT_MODE=live` plus a secret `SONAR_AGENT_KEYPAIR` (JSON array) only if you want the agent to place real primary buys.

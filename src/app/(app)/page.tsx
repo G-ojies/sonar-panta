@@ -29,6 +29,7 @@ export default async function RadarPage() {
           <span className="ping-dot" aria-hidden />
           {radar ? <span>scan {ago(now - radar.updatedAt)} ago · {radar.scanned} rows · {radar.durationMs ? `${(radar.durationMs / 1000).toFixed(0)}s` : ''}</span> : <span>radar has not run yet</span>}
           {log[0]?.errors ? <span className="text-amber">· {log[0].errors} API errors</span> : null}
+          {log[0]?.skipped ? <span title="Panta answered with a stripped row and nothing is cached; retried next scan">· {log[0].skipped} stripped rows skipped</span> : null}
         </div>
       </section>
 

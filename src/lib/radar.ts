@@ -18,7 +18,10 @@ const K = {
   log: 'sonar:refresh-log',
   resolved: 'sonar:resolved-ids',
   known: 'sonar:known-ids',
+  strikes: 'sonar:stripped-strikes',
 };
+/** Scans in a row a market may answer stripped with nothing cached before the registry lets it go. */
+const STRIKES_LIMIT = 6;
 /** Ids of every resolved market a scan has passed. The catalog rotates, so the backtest replays from this. */
 export const RESOLVED_IDS_KEY = K.resolved;
 
@@ -26,7 +29,10 @@ export interface RadarOutput {
   updatedAt: number;
   scanned: number;
   markets: RadarMarket[];
+  /** API failures: rate limits, 5xx, network. */
   errors: string[];
+  /** Markets Panta answered for with a stripped row and nothing cached. Not failures: retried next scan. */
+  skipped: string[];
   durationMs: number;
 }
 
@@ -53,6 +59,7 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   const t0 = Date.now();
   const now = Date.now() / 1000;
   const errors: string[] = [];
+  const skipped: string[] = [];
   const s = store();
 
   const rows = await listOpenMarkets(undefined, (m) => errors.push(m));
@@ -67,11 +74,15 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   if (ids.length === 0) {
     // Never replace a good radar with an empty one (transient API failure).
     const prev = await s.get<RadarOutput>(K.radar);
-    await s.lpush(K.log, { ts: now, scanned: 0, kept: prev?.markets.length ?? 0, errors: errors.length, durationMs: Date.now() - t0, note: 'empty scan, kept previous radar' }, 100);
-    if (prev) return { ...prev, errors: [...errors, 'empty scan: served previous radar'] };
+    await s.lpush(K.log, { ts: now, scanned: 0, kept: prev?.markets.length ?? 0, errors: errors.length, skipped: 0, durationMs: Date.now() - t0, note: 'empty scan, kept previous radar' }, 100);
+    if (prev) return { ...prev, errors: [...errors, 'empty scan: served previous radar'], skipped: prev.skipped ?? [] };
   }
 
   const hasContent = (d: MarketDetail | null | undefined): d is MarketDetail => !!d && !!(d.title || d.question || d.onChain?.question || d.onChain);
+  // A market that answers stripped with nothing cached, scan after scan, is one Panta no longer
+  // serves (deleted or never published). Count strikes so the registry can let it go instead of
+  // reporting the same fourteen ids as "API errors" forever.
+  const strikes = (await s.get<Record<string, number>>(K.strikes)) ?? {};
   const fetched = await mapLimit(ids, 4, async (id) => {
     try {
       const cached = await s.get<MarketDetail>(K.detail(id));
@@ -83,9 +94,11 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
       if (!hasContent(d)) { await new Promise((r) => setTimeout(r, 400)); d = await getMarket(id); }
       if (!hasContent(d)) {
         if (hasContent(cached)) return cached;
-        errors.push(`detail ${id}: stripped row from Panta, no cached copy`);
+        strikes[id] = (strikes[id] ?? 0) + 1;
+        skipped.push(`detail ${id}: stripped row from Panta, no cached copy (strike ${strikes[id]}/${STRIKES_LIMIT})`);
         return null;
       }
+      delete strikes[id];
       // resolved rows never change: keep them for a month so a stripped answer later has a good copy to fall back on
       await s.set(K.detail(id), d, d.phase === 'resolved' ? 30 * 86400 : 6 * 3600);
       return d;
@@ -96,9 +109,12 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   for (const d of fetched) if (d?.phase === 'resolved') known.add(d.marketId);
   if (known.size !== before) await s.set(K.resolved, [...known].slice(-1000));
   const details = fetched.filter((d): d is MarketDetail => !!d && shouldTrack(d, now));
-  // remember every id we have ever seen; only a *good* row that fails shouldTrack (cancelled,
-  // long resolved) drops out. Failed or stripped fetches stay so the next scan retries them.
+  // remember every id we have ever seen; a *good* row that fails shouldTrack (cancelled, long
+  // resolved) drops out, and so does an id that has answered stripped STRIKES_LIMIT scans running.
+  // Failed fetches and fresher stripped ones stay so the next scan retries them.
   const drop = new Set(ids.filter((_, i) => fetched[i] && !shouldTrack(fetched[i] as MarketDetail, now)));
+  for (const [id, n] of Object.entries(strikes)) if (n >= STRIKES_LIMIT) { drop.add(id); delete strikes[id]; }
+  await s.set(K.strikes, strikes);
   await s.set(K.known, [...new Set([...knownIds, ...ids])].filter((id) => !drop.has(id)).slice(-2000));
 
   const markets = await mapLimit(details, 4, async (d): Promise<RadarMarket | null> => {
@@ -128,12 +144,12 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   });
 
   const out: RadarOutput = {
-    updatedAt: now, scanned: ids.length, errors,
+    updatedAt: now, scanned: ids.length, errors, skipped,
     markets: markets.filter((m): m is RadarMarket => !!m).sort(rank),
     durationMs: Date.now() - t0,
   };
   await s.set(K.radar, out);
-  await s.lpush(K.log, { ts: now, scanned: out.scanned, kept: out.markets.length, errors: errors.length, durationMs: out.durationMs }, 100);
+  await s.lpush(K.log, { ts: now, scanned: out.scanned, kept: out.markets.length, errors: errors.length, skipped: skipped.length, durationMs: out.durationMs }, 100);
   return out;
 }
 
@@ -160,5 +176,5 @@ export async function readSnapshots(id: string): Promise<Snapshot[]> {
 }
 
 export async function readRefreshLog() {
-  return store().lrange<{ ts: number; scanned: number; kept: number; errors: number; durationMs: number }>(K.log, 0, 20);
+  return store().lrange<{ ts: number; scanned: number; kept: number; errors: number; skipped?: number; durationMs: number }>(K.log, 0, 20);
 }

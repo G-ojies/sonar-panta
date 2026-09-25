@@ -13,6 +13,6 @@ export async function GET(req: NextRequest) {
   if (secret && auth !== `Bearer ${secret}` && key !== secret) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   try {
     const r = await refreshRadar({ venues: req.nextUrl.searchParams.get('venues') !== '0' });
-    return NextResponse.json({ ok: true, scanned: r.scanned, kept: r.markets.length, errors: r.errors.length, durationMs: r.durationMs });
+    return NextResponse.json({ ok: true, scanned: r.scanned, kept: r.markets.length, errors: r.errors.length, skipped: r.skipped.length, durationMs: r.durationMs });
   } catch (e) { return fail(e); }
 }

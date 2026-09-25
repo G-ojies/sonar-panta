@@ -7,8 +7,9 @@ import { storeKind } from '../src/lib/store';
 async function main() {
   console.log(`store=${storeKind()} base=${process.env.PANTA_API_BASE_URL}`);
   const r = await refreshRadar({ venues: process.argv.includes('--no-venues') ? false : true });
-  console.log(`scanned=${r.scanned} kept=${r.markets.length} errors=${r.errors.length} in ${r.durationMs}ms`);
+  console.log(`scanned=${r.scanned} kept=${r.markets.length} errors=${r.errors.length} skipped=${r.skipped.length} in ${r.durationMs}ms`);
   for (const e of r.errors.slice(0, 8)) console.log('  !', e);
+  for (const e of r.skipped.slice(0, 4)) console.log('  -', e);
   for (const m of r.markets.slice(0, 25)) {
     const d = m.detail, s = m.signals;
     console.log(
