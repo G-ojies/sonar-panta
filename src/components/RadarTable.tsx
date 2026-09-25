@@ -7,13 +7,14 @@ import { ConfidenceDots, ScoreBar, SideChip } from './SignalBadge';
 
 type Filter = 'all' | 'open' | 'tradable' | 'matched' | 'resolved';
 
-export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: number }) {
+export function RadarTable({ markets, now, topic }: { markets: RadarMarket[]; now: number; topic?: string }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
     return markets.filter((m) => {
       const d = m.detail;
+      if (topic && (d.category || 'other').toLowerCase() !== topic) return false;
       if (filter === 'open' && !d.onChain?.isActive) return false;
       if (filter === 'tradable' && !m.tradable) return false;
       if (filter === 'matched' && !m.venue) return false;
@@ -21,7 +22,7 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
       if (t && !`${d.title} ${d.question ?? ''} ${d.category}`.toLowerCase().includes(t)) return false;
       return true;
     });
-  }, [markets, filter, q]);
+  }, [markets, filter, q, topic]);
 
   const counts = useMemo(() => ({
     all: markets.length,
@@ -35,9 +36,10 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
   ];
 
   return (
-    <section>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-line pb-2">
-        <div role="tablist" aria-label="Filter markets" className="flex gap-5 overflow-x-auto whitespace-nowrap">
+    <section className="card overflow-hidden">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-line px-4 py-3">
+        {topic && <span className="pill pill-ping capitalize">{topic.replace(/-/g, ' ')}</span>}
+        <div role="tablist" aria-label="Filter markets" className="flex gap-1 overflow-x-auto whitespace-nowrap">
           {tabs.map((t) => (
             <button key={t.k} role="tab" aria-selected={filter === t.k} onClick={() => setFilter(t.k)} className="filter">
               {t.label} <span className="mono ml-1 text-[11px] text-fog-2">{counts[t.k]}</span>
@@ -51,7 +53,7 @@ export function RadarTable({ markets, now }: { markets: RadarMarket[]; now: numb
       </div>
 
       {rows.length === 0 ? (
-        <p className="max-w-xl py-8 text-sm leading-relaxed text-fog">
+        <p className="max-w-xl px-4 py-8 text-sm leading-relaxed text-fog">
           {filter === 'tradable' ? 'No market is in its primary buy window right now. Panta opens new breaking markets through the day, and the agent keeps watching.' : filter === 'matched' ? 'None of the open questions trades on Polymarket or Kalshi at the moment. The matcher only pairs questions that share a subject, so it reports nothing rather than a wrong match.' : 'No market matches that. Try another filter, or clear the search.'}
         </p>
       ) : (

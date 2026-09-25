@@ -7,6 +7,7 @@ import { explorerTx } from '@/lib/solana';
 import { useApi } from './useApi';
 import { ConfidenceDots, ScoreBar, SideChip } from './SignalBadge';
 import { Sparkline } from './Sparkline';
+import { PriceChart } from './PriceChart';
 import { TradePanel } from './TradePanel';
 import { PoweredByPanta } from './PoweredByPanta';
 
@@ -47,10 +48,21 @@ export function MarketView({ id }: { id: string }) {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <section className="flex flex-wrap items-baseline gap-x-8 gap-y-2 border-b border-line pb-4">
-            <div><span className="text-xs text-fog-2">YES</span> <span className="mono ml-2 text-3xl font-semibold text-yes">{cents(yesPrice)}</span></div>
-            <div><span className="text-xs text-fog-2">NO</span> <span className="mono ml-2 text-3xl font-semibold text-no">{cents(yesPrice === null ? null : 1 - yesPrice)}</span></div>
-            <p className="text-sm text-fog sm:ml-auto"><span className="mono text-paper">{usd(d.totalVolumeUsdc ?? d.volumeUsdc, 0)}</span> traded across <span className="mono text-paper">{oc?.totalTrades ?? tape.length}</span> prints</p>
+          <section className="card p-5">
+            <div className="grid gap-5 lg:grid-cols-5">
+              <div className="space-y-3 lg:col-span-2">
+                <div className="price-tile price-yes"><span>Yes</span><strong>{cents(yesPrice)}</strong></div>
+                <div className="price-tile price-no"><span>No</span><strong>{cents(yesPrice === null ? null : 1 - yesPrice)}</strong></div>
+                <p className="text-sm text-fog"><span className="mono text-paper">{usd(d.totalVolumeUsdc ?? d.volumeUsdc, 0)}</span> traded across <span className="mono text-paper">{oc?.totalTrades ?? tape.length}</span> prints</p>
+              </div>
+              <div className="lg:col-span-3">
+                <div className="mb-2 flex items-center justify-between text-xs text-fog-2">
+                  <span className="flex items-center gap-4"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-ping" /> YES</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-violet" /> NO</span></span>
+                  <span>Sonar snapshots, every 10 min</span>
+                </div>
+                <PriceChart snaps={data.snapshots} height={210} />
+              </div>
+            </div>
           </section>
 
           <section className="panel p-4">
@@ -59,7 +71,7 @@ export function MarketView({ id }: { id: string }) {
               <SideChip side={s.side} score={s.score} />
               <ConfidenceDots level={s.confidence} />
               <ScoreBar score={s.score} />
-              <span className="ml-auto text-xs text-fog-2">24h <Sparkline snaps={data.snapshots} /></span>
+              <span className="ml-auto text-xs text-fog-2">24h <Sparkline snaps={data.snapshots.filter((x) => now - x.ts < 86400)} /></span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-paper">
               {s.side === 'FLAT'

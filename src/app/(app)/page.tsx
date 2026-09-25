@@ -1,66 +1,145 @@
-import { readRadar, readRefreshLog } from '@/lib/radar';
+import Link from 'next/link';
+import { readRadar, readRefreshLog, readSnapshots } from '@/lib/radar';
 import { readBacktest } from '@/lib/backtest';
 import { RadarTable } from '@/components/RadarTable';
-import { Masthead, Strip, agoWords, cap, plural, words } from '@/components/Desk';
-import { Sweep } from '@/components/Sweep';
-import type { StripItem } from '@/components/Desk';
+import { PriceChart } from '@/components/PriceChart';
+import { SideChip, ConfidenceDots } from '@/components/SignalBadge';
+import { agoWords, cap, plural, words } from '@/components/Desk';
+import { cents, untilText, usd } from '@/lib/format';
+import type { RadarMarket } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function RadarPage() {
+const q = (m: RadarMarket) => m.detail.title || m.detail.question || m.detail.onChain?.question || m.detail.marketId;
+const vol = (m: RadarMarket) => Number(m.detail.totalVolumeUsdc ?? m.detail.volumeUsdc ?? 0);
+
+export default async function RadarPage({ searchParams }: { searchParams?: { topic?: string } }) {
   const [radar, bt, log] = await Promise.all([readRadar(), readBacktest(), readRefreshLog()]);
   const now = Date.now() / 1000;
+  const topic = (searchParams?.topic ?? '').toLowerCase() || undefined;
   const markets = radar?.markets ?? [];
+  const open = markets.filter((m) => m.detail.onChain?.isActive);
   const live = markets.filter((m) => m.tradable).length;
-  const open = markets.filter((m) => m.detail.onChain?.isActive).length;
   const matched = markets.filter((m) => m.venue).length;
-  const calls = markets.filter((m) => m.signals.side !== 'FLAT' && m.detail.phase !== 'resolved').length;
-  const resolved = markets.filter((m) => m.detail.phase === 'resolved').length;
+  const calls = open.filter((m) => m.signals.side !== 'FLAT').length;
   const last = log[0];
 
-  // The opening line is written from the numbers, so it says what the desk actually sees right now.
-  const title = !radar
+  // the market of the moment: the open one with the most money behind it
+  const ranked = [...open].sort((a, b) => vol(b) - vol(a));
+  const hero = ranked[0] ?? markets[0];
+  const snaps = hero ? await readSnapshots(hero.detail.marketId).catch(() => []) : [];
+  const trending = ranked.slice(0, 4);
+  const byTopic = new Map<string, number>();
+  for (const m of open) { const k = (m.detail.category || 'other').toLowerCase(); byTopic.set(k, (byTopic.get(k) ?? 0) + vol(m)); }
+  const hot = [...byTopic.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  const line = !radar
     ? 'The radar has not run yet.'
-    : open === 0
+    : open.length === 0
       ? 'Nothing is open on Panta right now.'
-      : `${cap(words(open))} ${plural(open, 'market is', 'markets are')} open on Panta right now.` +
-        (calls > 0
-          ? ` ${cap(words(calls))} ${plural(calls, 'carries', 'carry')} a Sonar call.`
-          : ' None of them has enough tape for a read yet.') +
+      : `${cap(words(open.length))} ${plural(open.length, 'market is', 'markets are')} open on Panta right now.` +
+        (calls > 0 ? ` ${cap(words(calls))} ${plural(calls, 'carries', 'carry')} a Sonar call.` : ' None of them has enough tape for a read yet.') +
         (matched > 0 ? ` ${cap(words(matched))} also ${plural(matched, 'trades', 'trade')} on Polymarket or Kalshi.` : '');
 
-  const note = radar ? (
-    <>
-      Last scan {agoWords(now - radar.updatedAt)} ago: {radar.scanned} rows in {radar.durationMs ? `${Math.round(radar.durationMs / 1000)} seconds` : 'a moment'}.
-      {last?.skipped ? ` ${last.skipped} came back stripped from Panta and were skipped.` : ''}
-      {last?.errors ? <span className="text-amber"> {last.errors} {plural(last.errors, 'call', 'calls')} to the Panta API failed.</span> : null}
-      {resolved > 0 ? ` Behind the open markets sit ${resolved} resolved ones, four months of history the backtest and the agent settle against.` : ''}
-      {' '}Every market is scored from its own trade tape and priced against Polymarket and Kalshi. Positive leans YES, negative leans NO.
-    </>
-  ) : (
-    <>Run <code className="mono text-paper">npm run snapshot</code> or POST <code className="mono text-paper">/api/agent</code> to take the first scan.</>
-  );
-
-  const strip: StripItem[] = [
-    { k: 'open on-chain', v: open, title: 'isActive on the Panta detail row' },
-    { k: 'tradable now', v: live, tone: live ? 'ping' : undefined, title: 'primary phase, buys accepted' },
-    { k: 'on other venues', v: matched, title: 'same question found on Polymarket or Kalshi' },
-    { k: 'Sonar calls', v: calls, tone: calls ? 'ping' : undefined, title: 'non-flat signals on open markets' },
-    { k: 'resolved history', v: resolved },
-  ];
-  if (bt && bt.calls > 0) strip.push({ k: 'backtest', v: `${bt.hits} of ${bt.calls} hit`, tone: bt.hitRate !== null && bt.hitRate >= 0.5 ? 'yes' : 'no', href: '/agent', title: `${bt.markets} resolved markets replayed from the first 60% of each tape` });
-
   return (
-    <div className="space-y-8">
-      <Masthead kicker="Radar" title={title} note={note} aside={<Sweep blips={open} />}>
-        <Strip items={strip} className="mt-6" />
-      </Masthead>
+    <div className="space-y-6">
+      {/* status line */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-fog-2">
+        <span className="ping-dot" aria-hidden />
+        {radar ? <span>scan {agoWords(now - radar.updatedAt)} ago · {radar.scanned} rows</span> : <span>no scan yet</span>}
+        {last?.skipped ? <span>· {last.skipped} stripped rows skipped</span> : null}
+        {last?.errors ? <span className="text-amber">· {last.errors} API errors</span> : null}
+        <span className="hidden sm:inline">· Positive score leans YES, negative leans NO</span>
+      </div>
 
-      {radar ? (
-        <RadarTable markets={markets} now={now} />
-      ) : (
-        <p className="text-sm text-fog">Nothing to show until the first scan lands.</p>
-      )}
+      <div className="grid gap-6 xl:grid-cols-3">
+        {/* hero card */}
+        <section className="card xl:col-span-2">
+          {hero ? (
+            <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-5">
+              <div className="space-y-5 lg:col-span-2">
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-fog-2">
+                  <span className="pill">{hero.detail.category || 'market'}</span>
+                  {hero.detail.marketType === 'breaking' && <span className="pill pill-amber">breaking</span>}
+                  {hero.tradable && <span className="pill pill-ping">tradable now</span>}
+                </div>
+                <h1 className="text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
+                  <Link href={`/market/${hero.detail.marketId}`} className="text-paper no-underline hover:underline">{q(hero)}</Link>
+                </h1>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="price-tile price-yes"><span>Yes</span><strong>{cents(hero.yesPrice)}</strong></div>
+                  <div className="price-tile price-no"><span>No</span><strong>{cents(hero.yesPrice === null ? null : 1 - hero.yesPrice)}</strong></div>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fog">
+                  <span><span className="mono text-paper">{usd(vol(hero), 0)}</span> vol</span>
+                  <span><span className="mono text-paper">{hero.detail.onChain?.totalTrades ?? hero.tape.length}</span> prints</span>
+                  <span>{hero.detail.phase === 'resolved' ? 'resolved' : untilText(Number(hero.detail.endTime) - now)}</span>
+                </div>
+                <div className="rounded-xl bg-ink-3/60 p-3 text-sm">
+                  <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-fog-2">Sonar read <SideChip side={hero.signals.side} score={hero.signals.score} /><ConfidenceDots level={hero.signals.confidence} /></div>
+                  <p className="text-fog">{hero.signals.side === 'FLAT' ? (hero.signals.reasons[0] ? cap(hero.signals.reasons[0]) : 'No read yet') : `Leans ${hero.signals.side} with ${hero.signals.confidence} confidence.`}</p>
+                </div>
+                <Link href={`/market/${hero.detail.marketId}`} className="btn btn-primary w-full sm:w-auto">Open market</Link>
+              </div>
+              <div className="flex flex-col lg:col-span-3">
+                <div className="mb-2 flex items-center justify-between text-xs text-fog-2">
+                  <span className="flex items-center gap-4"><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-ping" /> YES</span><span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-violet" /> NO</span></span>
+                  <span>Sonar snapshots, every 10 min</span>
+                </div>
+                <PriceChart snaps={snaps} height={330} />
+              </div>
+            </div>
+          ) : (
+            <div className="p-8 text-sm text-fog">Nothing to show until the first scan lands.</div>
+          )}
+        </section>
+
+        {/* trending + hot topics */}
+        <aside className="space-y-6">
+          <section className="card p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><span aria-hidden>🔥</span> Trending markets</h2>
+            {trending.length === 0 ? <p className="text-sm text-fog-2">No open markets.</p> : (
+              <ol className="space-y-3">
+                {trending.map((m, i) => (
+                  <li key={m.detail.marketId} className="flex items-start gap-3">
+                    <span className="mono w-4 pt-0.5 text-xs text-fog-2">{i + 1}</span>
+                    <Link href={`/market/${m.detail.marketId}`} className="min-w-0 flex-1 text-sm leading-snug text-paper no-underline hover:underline">{q(m)}</Link>
+                    <span className="mono shrink-0 text-right text-xs leading-tight">
+                      <span className="block text-yes">{Math.round((m.yesPrice ?? 0.5) * 100)}%</span>
+                      <span className="block text-no">{Math.round((1 - (m.yesPrice ?? 0.5)) * 100)}%</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+          <section className="card p-5">
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><span aria-hidden>🔥</span> Hot topics</h2>
+            {hot.length === 0 ? <p className="text-sm text-fog-2">Nothing trading.</p> : (
+              <ol className="space-y-2.5">
+                {hot.map(([k, v], i) => (
+                  <li key={k} className="flex items-center gap-3 text-sm">
+                    <span className="mono w-4 text-xs text-fog-2">{i + 1}</span>
+                    <Link href={`/?topic=${encodeURIComponent(k)}`} className="flex-1 capitalize text-paper no-underline hover:underline">{k.replace(/-/g, ' ')}</Link>
+                    <span className="mono text-xs text-fog">{usd(v, 0)} open</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+          {bt && bt.calls > 0 && (
+            <Link href="/agent" className="card block p-5 no-underline hover:border-fog-2 hover:no-underline">
+              <div className="text-[11px] uppercase tracking-wide text-fog-2">Backtest on resolved markets</div>
+              <div className="mono mt-1 text-lg font-semibold text-paper">{bt.hits} of {bt.calls} calls hit</div>
+              <div className="text-xs text-fog">{bt.markets} markets replayed · {bt.flat} flat · see the agent&apos;s record</div>
+            </Link>
+          )}
+        </aside>
+      </div>
+
+      <p className="text-sm text-fog">{line}{live ? ` ${cap(words(live))} ${plural(live, 'is', 'are')} in the primary buy window.` : ''}</p>
+
+      {radar && <RadarTable markets={markets} now={now} topic={topic} />}
     </div>
   );
 }
