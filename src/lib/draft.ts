@@ -31,12 +31,16 @@ export async function draftMarket(input: string, now = Date.now() / 1000): Promi
   if (!process.env.ANTHROPIC_API_KEY) return templateDraft(input, now);
   const client = new Anthropic();
   const today = new Date(now * 1000).toISOString();
-  const res = await client.messages.create({
+  let res: Awaited<ReturnType<typeof client.messages.create>>;
+  try {
+    res = await client.messages.create({
     model: 'claude-sonnet-5',
     max_tokens: 1200,
     system: `You draft binary prediction markets for Panta (Solana). Output only JSON matching the schema. Rules: the question must be a single, objectively verifiable YES/NO event with a fixed deadline; the resolutionRule must name the exact data source and the precise condition, timezone UTC; sourcesOfTruth are 1-3 public URLs; category is one of ${CATS.join(', ')}; endTime and resolutionTime are unix seconds, endTime at least 2 hours after now (${today}) and resolutionTime >= endTime; marketType is "breaking" only if the event resolves within 48 hours. Keep the title under 80 chars.`,
     messages: [{ role: 'user', content: `Draft one market from this input:\n\n${input}\n\nReturn JSON with keys: question, title, description, resolutionRule, sourcesOfTruth, category, endTime, resolutionTime, marketType, rationale.` }],
-  });
+    });
+  } catch { return templateDraft(input, now); } // bad or missing key, network, rate limit: the template still works
+  if (!('content' in res)) return templateDraft(input, now);
   const text = res.content.map((c) => (c.type === 'text' ? c.text : '')).join('');
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) return templateDraft(input, now);
