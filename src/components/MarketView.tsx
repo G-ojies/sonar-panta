@@ -65,7 +65,7 @@ export function MarketView({ id }: { id: string }) {
             </div>
           </section>
 
-          <section className="panel p-4">
+          <section className="card p-5">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="font-medium">Sonar read</h2>
               <SideChip side={s.side} score={s.score} />
@@ -93,8 +93,8 @@ export function MarketView({ id }: { id: string }) {
             </dl>
           </section>
 
-          <section className="panel p-4">
-            <h2 className="font-medium">Same question elsewhere</h2>
+          <section className="card p-5">
+            <h2 className="font-medium">Across venues</h2>
             {venue ? (
               <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
                 <a href={venue.url} target="_blank" rel="noopener noreferrer" className="max-w-lg truncate">{venue.question}</a>
@@ -102,19 +102,19 @@ export function MarketView({ id }: { id: string }) {
                 {s.crossVenueGap !== null && <span className={`mono ${Math.abs(s.crossVenueGap) >= 0.05 ? (s.crossVenueGap > 0 ? 'text-yes' : 'text-no') : 'text-fog'}`}>gap {s.crossVenueGap > 0 ? '+' : ''}{Math.round(s.crossVenueGap * 100)}pts</span>}
                 <span className="text-xs text-fog-2">match {venue.similarity.toFixed(2)}{venue.volume24h ? ` · ${usd(venue.volume24h, 0)} 24h` : ''}</span>
               </div>
-            ) : <p className="mt-2 text-sm text-fog">No close match on Polymarket or Kalshi. This question is Panta-only.</p>}
+            ) : <p className="mt-2 text-sm text-fog">Not listed on Polymarket or Kalshi. This question trades only on Panta.</p>}
           </section>
 
-          <section className="panel p-4">
-            <h2 className="font-medium">Resolution</h2>
-            <p className="mt-2 text-sm text-fog">{rule || 'No rule text returned by the API.'}</p>
+          <section className="card p-5">
+            <h2 className="font-medium">How it resolves</h2>
+            <p className="mt-2 text-sm text-fog">{rule || 'Panta returned no resolution rule for this market.'}</p>
             {(d.sources?.length || oc?.sources?.length) ? <p className="mono mt-2 text-xs text-fog-2">sources: {(d.sources ?? oc?.sources ?? []).join(', ')}</p> : null}
             {d.oracle && <p className="mono text-xs text-fog-2">oracle: {d.oracle}</p>}
           </section>
 
-          <section className="panel overflow-hidden">
-            <h2 className="border-b border-line px-4 py-3 font-medium">Tape <span className="text-xs font-normal text-fog-2">last {tape.length} prints</span></h2>
-            {tape.length === 0 ? <p className="p-4 text-sm text-fog">No prints yet.</p> : (
+          <section className="card overflow-hidden">
+            <h2 className="border-b border-line px-5 py-4 font-medium">Trade tape <span className="text-xs font-normal text-fog-2">last {tape.length} prints</span></h2>
+            {tape.length === 0 ? <p className="p-5 text-sm text-fog">No trades yet. The first print shows here the moment it lands.</p> : (
               <div className="max-h-96 overflow-auto">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-ink-2 text-left uppercase tracking-wide text-fog-2"><tr><th className="px-4 py-2 font-medium">Side</th><th className="px-2 py-2 font-medium">Shares</th><th className="px-2 py-2 font-medium">Wallet</th><th className="px-2 py-2 font-medium">When</th><th className="px-2 py-2 font-medium">Tx</th></tr></thead>

@@ -47,7 +47,7 @@ Panta's test fixtures, so the whole flow can be demoed with an empty wallet."
 > amber and reads **Sandbox**, and an amber banner appears under the header
 > saying nothing is sent on chain. Stay on the GTA 6 page.
 > **Click 7.** Scroll to the trade panel, which is now unlocked with no wallet.
-> Leave YES selected and the default amount. Click **Get quote**. Shares and
+> Leave YES selected and the default amount. Click **Get a quote**. Shares and
 > expiry appear.
 > **Click 8.** Click **Sign & buy YES**. The sandbox signature Panta returned
 > appears, then the line "Trade reported to Panta (attributed to Sonar)". Say: "Same code path on mainnet; there the

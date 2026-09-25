@@ -45,7 +45,7 @@ export function AgentView({ state, summary, backtest }: { state: AgentState | nu
         <div className="flex flex-wrap items-center gap-2 lg:col-span-4 lg:justify-end">
           {state && (
             <span className="pill">
-              <span className="dot-live mr-2" aria-hidden />{state.mode} · run {state.runs} · {agoWords(now - state.lastRunAt)} ago
+              <span className="dot-live mr-2" aria-hidden />{state.mode} · run {state.runs}
             </span>
           )}
           <PoweredByPanta />

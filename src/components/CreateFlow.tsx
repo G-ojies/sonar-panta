@@ -102,7 +102,7 @@ export function CreateFlow() {
     <div className="space-y-6">
       <Masthead kicker="Create" title="Turn a headline into a market Panta can resolve." note="Paste a headline, a question or a URL. Sonar drafts a YES/NO market with a rule that can actually be settled; you edit it, Panta quotes the fee, your wallet signs. Creators earn a share of every trade their market attracts." aside={<PoweredByPanta />} />
 
-      <section className="panel p-4">
+      <section className="card p-4">
         <label htmlFor="in" className="label">Headline, question or URL</label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <input id="in" className="field" value={input} onChange={(e) => setInput(e.target.value)} placeholder="e.g. Will BTC close above $120k on 1 October?" />
@@ -125,8 +125,8 @@ export function CreateFlow() {
       </section>
 
       {draft && (
-        <section className="panel space-y-3 p-4">
-          <div className="flex items-center justify-between"><h2 className="font-medium">Draft</h2><span className="text-xs text-fog-2">via {draft.via}</span></div>
+        <section className="card space-y-3 p-4">
+          <div className="flex items-center justify-between"><h2 className="font-medium">Your draft</h2><span className="text-xs text-fog-2">via {draft.via}</span></div>
           {draft.rationale && <p className="text-xs text-fog">{draft.rationale}</p>}
           <Field label="Question" id="q"><input id="q" className="field" value={draft.question} onChange={(e) => upd('question', e.target.value)} maxLength={500} /></Field>
           <Field label="Title" id="t"><input id="t" className="field" value={draft.title} onChange={(e) => upd('title', e.target.value)} maxLength={80} /></Field>

@@ -47,15 +47,15 @@ export function PortfolioView() {
       <Masthead kicker="Portfolio" title="Your Panta positions, marked to the live YES and NO price." note="Claim winnings from here. A claim is a transaction like any other: Panta builds it, your wallet signs it." aside={<PoweredByPanta />} />
 
       {!wallet ? (
-        <div className="panel flex flex-col items-center gap-3 p-10 text-center text-sm text-fog">
+        <div className="card flex flex-col items-center gap-3 p-10 text-center text-sm text-fog">
           <p>Connect a wallet to see its positions.</p><WalletButton />
         </div>
       ) : loading && !data ? (
         <div className="space-y-3" aria-busy="true">{[0, 1, 2].map((i) => <div key={i} className="skeleton h-14" />)}</div>
       ) : error && !data ? (
-        <div className="panel p-8 text-center text-sm"><p className="text-no">{error}</p><button className="btn mt-4" onClick={reload}>Retry</button></div>
+        <div className="card p-8 text-center text-sm"><p className="text-no">{error}</p><button className="btn mt-4" onClick={reload}>Retry</button></div>
       ) : data && data.positions.length === 0 ? (
-        <div className="panel p-10 text-center text-sm text-fog">
+        <div className="card p-10 text-center text-sm text-fog">
           No positions for <span className="mono text-paper">{wallet.slice(0, 4)}…{wallet.slice(-4)}</span>{sandbox ? ' in the sandbox (Panta fixtures return none)' : ''}. <Link href="/">Find a market on the Radar.</Link>
         </div>
       ) : data && (
@@ -66,7 +66,7 @@ export function PortfolioView() {
             { k: 'open', v: data.positions.filter((r) => !r.outcome).length },
             { k: 'claimable', v: data.positions.filter((r) => r.claimable && !r.claimed).length, tone: data.positions.some((r) => r.claimable && !r.claimed) ? 'ping' : undefined },
           ]} />
-          <section className="panel overflow-x-auto">
+          <section className="card overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-fog-2"><tr className="border-b border-line">
                 <th className="px-3 py-2 font-medium">Market</th><th className="px-3 py-2 font-medium">Side</th><th className="px-3 py-2 font-medium">Shares</th><th className="px-3 py-2 font-medium">Price</th><th className="px-3 py-2 font-medium">Value</th><th className="px-3 py-2 font-medium">Status</th><th className="px-3 py-2" />

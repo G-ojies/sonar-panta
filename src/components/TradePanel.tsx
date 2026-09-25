@@ -71,17 +71,17 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
   }
 
   return (
-    <section className="panel p-4" aria-labelledby="trade-h">
+    <section className="card p-5" aria-labelledby="trade-h">
       <div className="flex items-center justify-between">
         <h2 id="trade-h" className="font-medium">Trade</h2>
-        <span className={`text-[11px] uppercase tracking-wide ${sandbox ? 'text-amber' : 'text-fog-2'}`}>{sandbox ? 'sandbox · panta fixtures · no funds' : 'non-custodial · mainnet USDC'}</span>
+        <span className={`text-[11px] uppercase tracking-wide ${sandbox ? 'text-amber' : 'text-fog-2'}`}>{sandbox ? 'sandbox · no funds needed' : 'non-custodial · mainnet USDC'}</span>
       </div>
 
       {!tradable && !sandbox ? (
         <p className="mt-3 text-sm text-fog">
-          {market.phase === 'resolved' ? 'This market has resolved. Winning shares are claimed from the Portfolio page.' :
-           market.onChain?.isGraduated ? 'Primary window closed: this market graduated to secondary trading, which the public API does not expose yet.' :
-           'Not accepting primary buys right now.'}
+          {market.phase === 'resolved' ? 'This market has resolved. Claim winning shares from Portfolio.' :
+           market.onChain?.isGraduated ? 'Buying has closed here. The market moved to Panta\'s secondary phase, which the public API does not expose yet.' :
+           'Not taking buys right now.'}
         </p>
       ) : (
         <form className="mt-3 space-y-3" onSubmit={(e) => { e.preventDefault(); if (step === 'quoted') execute(); else getQuote(); }}>
@@ -115,9 +115,9 @@ export function TradePanel({ market, yesPrice, tradable, lean, onDone }: { marke
           )}
 
           {!wallet ? <WalletButton /> : (<>
-            {!publicKey && sandbox && <p className="text-xs text-amber">No wallet connected: using a read-only demo address in the sandbox.</p>}
+            {!publicKey && sandbox && <p className="text-xs text-amber">No wallet connected. The sandbox uses a read-only demo address.</p>}
             <button type="submit" disabled={busy} className={`btn w-full ${step === 'quoted' ? 'btn-primary' : ''}`}>
-              {step === 'idle' || step === 'error' ? 'Get quote' : step === 'quoting' ? 'Quoting…' : step === 'quoted' ? `Sign & buy ${side.toUpperCase()}` :
+              {step === 'idle' || step === 'error' ? 'Get a quote' : step === 'quoting' ? 'Quoting…' : step === 'quoted' ? `Sign & buy ${side.toUpperCase()}` :
                step === 'building' ? 'Building transaction…' : step === 'signing' ? 'Approve in wallet…' : step === 'broadcasting' ? 'Broadcasting…' : step === 'submitting' ? 'Confirming with Panta…' : 'Done'}
             </button>
           </>)}

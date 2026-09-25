@@ -46,7 +46,7 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
       {/* status line */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fog-2">
         <span className="dot-live" aria-hidden />
-        {radar ? <span>Live from Panta · updated {agoWords(now - radar.updatedAt)} ago · {radar.scanned} markets scanned</span> : <span>Waiting for the first scan</span>}
+        {radar ? <span>Live from Panta · {radar.scanned} markets scanned</span> : <span>Waiting for the first scan</span>}
         {/* one or two failed calls a scan is Panta's normal weather and is retried next tick; only say so when it is material */}
         {last && (last.errors >= 5 || (radar && now - radar.updatedAt > 1800 && last.errors > 0)) ? <span className="text-amber">· {last.errors} API {plural(last.errors, 'call', 'calls')} failed on the last scan</span> : null}
       </div>
