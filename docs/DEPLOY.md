@@ -1,6 +1,6 @@
 # Deploying Sonar for Panta
 
-Three moving parts: the Next.js app (Render free web service, `render.yaml`; Vercel also works), a Redis store (Upstash), and a scheduled tick that refreshes the radar and runs the agent (an external pinger hitting `/api/agent`, with GitHub Actions as fallback). Total cost on free tiers: $0.
+Three moving parts: the Next.js app (a Render free web service defined in `render.yaml`, served at https://sonar-panta.nodalytics.xyz), a Redis store (Upstash), and a scheduled tick that refreshes the radar and runs the agent (an external pinger hitting `/api/agent`, with GitHub Actions as fallback). Total cost on free tiers: $0.
 
 ## 1. Redis (Upstash)
 
@@ -15,35 +15,17 @@ Seed it with the history collected locally so the deployment does not start empt
 KV_REST_API_URL=... KV_REST_API_TOKEN=... npx tsx scripts/store-sync.ts .sonar-store.json
 ```
 
-## 1b. Hosting on Render (current production)
+## 2. Hosting on Render
 
 `render.yaml` at the repo root is a Render Blueprint: one free web service running `next start`. Because it is a long-lived Node process there is no function time limit, so the 90-second tick behind `POST /api/agent` simply runs to completion, and the same 10-minute pinger that drives it keeps the free instance from sleeping.
 
 1. Render dashboard → New → Blueprint → pick the GitHub repo. Render reads `render.yaml` and creates the service.
 2. Fill the secret env vars it asks for: `PANTA_API_KEY`, `PANTA_TEST_API_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_SOLANA_RPC` (and `ANTHROPIC_API_KEY` if you want Claude drafting). The non-secret ones are in the blueprint.
 3. First deploy takes about five minutes. Check `https://<service>.onrender.com/api/health`.
-4. Point the pinger (section 3a) at the Render URL and update `NEXT_PUBLIC_SITE_URL` if the service name differs from `sonar-panta`.
-5. If a Vercel deployment still exists, turn it into a redirect so old links keep working: `vercel.json` `"redirects": [{ "source": "/(.*)", "destination": "https://<service>.onrender.com/$1", "permanent": false }]`, then `npx vercel --prod` once more.
+4. Custom domain. Render service → Settings → Custom Domains → add `sonar-panta.nodalytics.xyz`. In Cloudflare DNS for `nodalytics.xyz` add a CNAME record: name `sonar-panta`, target `sonar-panta.onrender.com`, proxy **off** (DNS only) so Render can issue the certificate. Render verifies within a few minutes and serves HTTPS. `NEXT_PUBLIC_SITE_URL` in the blueprint already points at this hostname.
+5. Point the pinger (section 3a) at `https://sonar-panta.nodalytics.xyz/api/agent`.
 
 Render redeploys on every push to `main` (`autoDeploy: true`).
-
-## 2. Vercel
-
-```bash
-vercel login
-vercel link            # create project "sonar-panta"
-vercel env add PANTA_API_KEY production        # pk_live_...
-vercel env add PANTA_API_BASE_URL production   # https://live-api.panta.market/api/v1
-vercel env add KV_REST_API_URL production
-vercel env add KV_REST_API_TOKEN production
-vercel env add CRON_SECRET production          # any long random string
-vercel env add NEXT_PUBLIC_SOLANA_RPC production   # a mainnet RPC (Helius/Triton free tier is fine)
-vercel env add NEXT_PUBLIC_SITE_URL production     # https://<project>.vercel.app
-vercel env add ANTHROPIC_API_KEY production        # optional: Claude drafting on /create
-vercel --prod
-```
-
-`vercel.json` declares one daily cron (`/api/refresh` at 06:00 UTC) as a last-resort fallback: the Hobby plan rejects anything more frequent.
 
 ## 3. Scheduler
 
@@ -55,7 +37,7 @@ The route answers `202` immediately and finishes the tick in the background (`wa
 
 | Field | Value |
 | --- | --- |
-| URL | `https://<project>.vercel.app/api/agent` |
+| URL | `https://sonar-panta.nodalytics.xyz/api/agent` |
 | Method | `POST` |
 | Header | `Authorization: Bearer <CRON_SECRET>` |
 | Schedule | every 10 minutes |
@@ -63,7 +45,7 @@ The route answers `202` immediately and finishes the tick in the background (`wa
 Check it by hand:
 
 ```bash
-curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://<project>.vercel.app/api/agent
+curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://sonar-panta.nodalytics.xyz/api/agent
 # {"ok":true,"started":true,"runs":18}   then /api/health shows a fresh radarUpdatedAt ~90 s later
 ```
 
@@ -84,7 +66,7 @@ Set the repository variable `SONAR_AGENT_MODE=live` plus a secret `SONAR_AGENT_K
 ## 4. Check
 
 ```bash
-curl https://<project>.vercel.app/api/health
+curl https://sonar-panta.nodalytics.xyz/api/health
 # {"ok":true,"store":"redis","panta":"ok:active","radarMarkets":64,...}
 ```
 

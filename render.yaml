@@ -19,7 +19,7 @@ services:
       - key: NEXT_PUBLIC_SOLANA_CLUSTER
         value: mainnet-beta
       - key: NEXT_PUBLIC_SITE_URL
-        value: https://sonar-panta.onrender.com
+        value: https://sonar-panta.nodalytics.xyz
       - key: SONAR_AGENT_MODE
         value: paper
       # set in the Render dashboard (sync: false = never written to the blueprint)
