@@ -32,6 +32,9 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
   const byTopic = new Map<string, number>();
   for (const m of open) { const k = (m.detail.category || 'other').toLowerCase(); byTopic.set(k, (byTopic.get(k) ?? 0) + vol(m)); }
   const hot = [...byTopic.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+  // anything about Nigeria, open or resolved, by the words a Nigerian would search for
+  const NG = /nigeria|naira|\bcbn\b|\bngx\b|super eagles|dangote|lagos|abuja|tinubu|\bnbs\b|\bmpr\b|bbnaija|afrobeats|burna|wizkid|davido|nnpc|\bpms\b/i;
+  const naija = markets.filter((m) => NG.test(q(m))).sort((a, b) => Number(a.detail.phase === 'resolved') - Number(b.detail.phase === 'resolved'));
 
   const line = !radar
     ? 'The radar has not run yet.'
@@ -120,6 +123,26 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
                   </li>
                 ))}
               </ol>
+            )}
+          </section>
+          <section className="card p-5">
+            <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold"><span aria-hidden>🇳🇬</span> Nigeria desk</h2>
+            {naija.length > 0 ? (
+              <ol className="mt-2 space-y-2.5">
+                {naija.slice(0, 4).map((m) => (
+                  <li key={m.detail.marketId} className="flex items-start gap-3 text-sm">
+                    <Link href={`/market/${m.detail.marketId}`} className="min-w-0 flex-1 leading-snug text-paper no-underline hover:underline">{q(m)}</Link>
+                    {m.detail.phase === 'resolved'
+                      ? <span className={`mono shrink-0 text-xs ${m.detail.onChain?.yesWins ? 'text-yes' : 'text-no'}`}>{m.detail.onChain?.yesWins ? 'YES won' : 'NO won'}</span>
+                      : <span className="mono shrink-0 text-xs text-yes">{Math.round((m.yesPrice ?? 0.5) * 100)}%</span>}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <>
+                <p className="text-sm leading-relaxed text-fog">Panta&apos;s public API lists no market about Nigeria yet: nothing on the CBN, the naira, inflation, the NGX or the Super Eagles. The first creator to list one earns a share of every trade it attracts.</p>
+                <Link href="/create" className="btn mt-3 w-full">Create the first Nigerian market</Link>
+              </>
             )}
           </section>
           {bt && bt.calls > 0 && (

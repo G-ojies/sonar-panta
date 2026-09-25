@@ -91,6 +91,8 @@ export async function listMarkets(p: ListParams = {}, opts?: CallOpts) {
  * so we widen coverage by fanning out over status × category and de-duplicating.
  */
 export async function listOpenMarkets(opts?: CallOpts, onError?: (msg: string) => void): Promise<MarketRow[]> {
+  // each known category returns a different 50-row slice; unknown categories (weather, gaming, stocks…) and the
+  // region filter return nothing, and P2P markets are absent altogether (feedback item 16), so this is the reachable set
   const cats = ['', 'sports', 'crypto', 'politics', 'entertainment', 'finance', 'science', 'world', 'other'];
   const seen = new Map<string, MarketRow>();
   const jobs: Promise<void>[] = [];
