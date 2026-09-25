@@ -54,7 +54,7 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
         {last && (last.errors >= 5 || (radar && now - radar.updatedAt > 1800 && last.errors > 0)) ? <span className="text-amber">· {last.errors} API {plural(last.errors, 'call', 'calls')} failed on the last scan</span> : null}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 xl:grid-cols-3 xl:items-start">
         {/* hero card */}
         <section className="card xl:col-span-2">
           {hero ? (
@@ -131,7 +131,7 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
               <ol className="mt-2 space-y-2.5">
                 {naija.slice(0, 4).map((m) => (
                   <li key={m.detail.marketId} className="flex items-start gap-3 text-sm">
-                    <Link href={`/market/${m.detail.marketId}`} className="min-w-0 flex-1 leading-snug text-paper no-underline hover:underline">{q(m)}</Link>
+                    <Link href={`/market/${m.detail.marketId}`} className="line-clamp-2 min-w-0 flex-1 leading-snug text-paper no-underline hover:underline" title={q(m)}>{q(m)}</Link>
                     {m.detail.phase === 'resolved'
                       ? <span className={`mono shrink-0 text-xs ${m.detail.onChain?.yesWins ? 'text-yes' : 'text-no'}`}>{m.detail.onChain?.yesWins ? 'YES won' : 'NO won'}</span>
                       : <span className="mono shrink-0 text-xs text-yes">{Math.round((m.yesPrice ?? 0.5) * 100)}%</span>}
