@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Snapshot } from '@/lib/types';
 import { PriceChart } from './PriceChart';
 import { useApi } from './useApi';
@@ -13,10 +13,20 @@ const RANGES: { k: Range; label: string; sec: number }[] = [
 
 /**
  * The price chart, alive: a range picker, the line draws in, the last point pulses, and when
- * `poll` is set the snapshots refresh every minute without a page reload.
+ * `poll` is set the snapshots refresh every minute without a page reload. With `fill` the chart
+ * measures its box and draws at exactly that size, so it grows to whatever the card gives it.
  */
-export function LiveChart({ marketId, snaps, height = 240, poll = false }: { marketId: string; snaps: Snapshot[]; height?: number; poll?: boolean }) {
+export function LiveChart({ marketId, snaps, height = 240, poll = false, fill = false }: { marketId: string; snaps: Snapshot[]; height?: number; poll?: boolean; fill?: boolean }) {
   const [range, setRange] = useState<Range>('7d');
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (!fill || !box.current) return;
+    const el = box.current;
+    const ro = new ResizeObserver(([e]) => { const r = e.contentRect; if (r.width > 40 && r.height > 40) setSize({ w: Math.round(r.width), h: Math.round(r.height) }); });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fill]);
   const { data } = useApi<{ snapshots: Snapshot[] }>(poll ? `/api/market/${marketId}` : null, [marketId, poll], 60_000);
   const all = data?.snapshots?.length ? data.snapshots : snaps;
   const shown = useMemo(() => {
@@ -27,7 +37,7 @@ export function LiveChart({ marketId, snaps, height = 240, poll = false }: { mar
     return inRange.length >= 2 ? inRange : all; // a range with nothing in it falls back to the whole record
   }, [all, range]);
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="mb-2 flex items-center justify-between text-xs text-fog-2">
         <span className="flex items-center gap-4">
           <span className="flex items-center gap-1.5"><i className="h-2 w-2 rounded-full bg-ping" /> YES</span>
@@ -39,7 +49,9 @@ export function LiveChart({ marketId, snaps, height = 240, poll = false }: { mar
           ))}
         </div>
       </div>
-      <PriceChart snaps={shown} height={height} live />
+      <div ref={box} className={fill ? 'min-h-[260px] flex-1' : ''}>
+        <PriceChart snaps={shown} height={fill && size ? size.h : height} width={fill && size ? size.w : 420} live />
+      </div>
     </div>
   );
 }

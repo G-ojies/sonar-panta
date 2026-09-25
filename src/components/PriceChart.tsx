@@ -4,10 +4,10 @@ import type { Snapshot } from '@/lib/types';
  * YES and NO price over time from Sonar's own snapshots. YES in blue, NO in violet,
  * end labels like a trading terminal. Pure SVG, no client code.
  */
-export function PriceChart({ snaps, height = 220, className = '', live = false }: { snaps: Snapshot[]; height?: number; className?: string; live?: boolean }) {
+export function PriceChart({ snaps, height = 220, width = 420, className = '', live = false }: { snaps: Snapshot[]; height?: number; width?: number; className?: string; live?: boolean }) {
   const pts = snaps.filter((s) => s.yesPrice !== null).map((s) => ({ t: s.ts, y: s.yesPrice as number }));
   // 420 wide: the chart sits in a column about that wide on desktop, so text renders near 1:1
-  const W = 420, H = height, padR = 46, padL = 8, padT = 14, padB = 30;
+  const W = width, H = height, padR = 46, padL = 8, padT = 14, padB = 30;
   if (pts.length < 2) {
     return (
       <div className={`flex items-center justify-center rounded-xl border border-dashed border-line text-center text-xs text-fog-2 ${className}`} style={{ height }}>
@@ -46,7 +46,7 @@ export function PriceChart({ snaps, height = 220, className = '', live = false }
   // a tick label that would sit under an end-point label gets out of its way
   const clear = (g: number) => Math.abs(y(g) - y(last.y)) > 11 && Math.abs(y(g) - y(1 - last.y)) > 11;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className={`h-auto w-full ${className}`} role="img" aria-label={`YES ${Math.round(pts[0].y * 100)}% to ${Math.round(last.y * 100)}%`}>
+    <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className={`block max-w-full ${className}`} role="img" aria-label={`YES ${Math.round(pts[0].y * 100)}% to ${Math.round(last.y * 100)}%`}>
       {ticks.map((g) => (
         <g key={g}>
           <line x1={padL} x2={W - padR} y1={y(g)} y2={y(g)} stroke="#1c1f2b" strokeDasharray="2 6" />
