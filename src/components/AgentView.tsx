@@ -38,7 +38,7 @@ export function AgentView({ state, summary, backtest }: { state: AgentState | nu
           <p className="mb-2 text-xs text-fog-2">Agent</p>
           <h1 className="display">{title}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-fog">
-            Every ten minutes the agent rescans Panta, takes a one-dollar paper position on every non-flat Sonar call, and settles it against Panta&apos;s own resolution.
+            Every ten minutes the agent rescans Panta, takes a one-dollar paper position on every non-flat Sonar call, and settles it against Panta&apos;s own resolution. It reads each market&apos;s prints from Panta&apos;s API and, where the API returns none, from the program&apos;s own log on chain.
             Each call, its reason and its result are on this page. Judge the engine by this record, not by the slides.
           </p>
         </div>
@@ -114,8 +114,8 @@ export function AgentView({ state, summary, backtest }: { state: AgentState | nu
         <section className="card overflow-hidden">
           <div className="grid gap-4 border-b border-line px-5 py-4 lg:grid-cols-12 lg:items-center">
             <div className="lg:col-span-6">
-              <h2 className="text-base font-semibold">Backtest: what Sonar would have called</h2>
-              <p className="mt-1 text-xs leading-relaxed text-fog-2">For each resolved Panta market, the signal is computed from the first 60% of its tape and compared with how the market resolved. Small sample, reported exactly as it comes out.</p>
+              <h2 className="text-base font-semibold">Replay: the agent&apos;s rule over every resolved market</h2>
+              <p className="mt-1 text-xs leading-relaxed text-fog-2">Each resolved Panta market is walked print by print. Sonar is asked for its read after every print, and the first non-flat read opens a one-dollar position at the price the chain logged right then. No look-ahead. Prints Panta&apos;s API does not return are decoded from the program log{backtest.chainTapes ? ` (${backtest.chainTapes} of ${backtest.markets} tapes)` : ''}. Reported exactly as it comes out.</p>
             </div>
             <dl className="strip lg:col-span-6 lg:justify-end">
               <div><dt>markets</dt><dd className="mono text-paper">{backtest.markets}</dd></div>
@@ -131,7 +131,8 @@ export function AgentView({ state, summary, backtest }: { state: AgentState | nu
                 <tr className="border-b border-line">
                   <th className="px-5 py-2.5 font-medium">Market</th>
                   <th className="px-3 py-2.5 font-medium">Call</th>
-                  <th className="px-3 py-2.5 font-medium">YES then</th>
+                  <th className="px-3 py-2.5 font-medium">Entry</th>
+                  <th className="px-3 py-2.5 font-medium">After print</th>
                   <th className="px-3 py-2.5 font-medium">Resolved</th>
                   <th className="px-3 py-2.5 font-medium">Hit</th>
                 </tr>
@@ -141,7 +142,8 @@ export function AgentView({ state, summary, backtest }: { state: AgentState | nu
                   <tr key={r.marketId} className="border-t border-line/60 transition-colors hover:bg-ink-3/40">
                     <td className="max-w-md px-5 py-2.5"><Link href={`/market/${r.marketId}`} className="block truncate text-paper no-underline hover:underline">{r.title}</Link></td>
                     <td className="px-3 py-2.5"><span className={sidePill(r.side)}>{r.side}</span>{r.side !== 'FLAT' && <span className="mono ml-2 text-xs text-fog-2">{r.score > 0 ? '+' : ''}{r.score}</span>}</td>
-                    <td className="mono px-3 py-2.5 text-fog">{cents(r.yesPriceAtCall)}</td>
+                    <td className="mono px-3 py-2.5 text-fog">{r.entryPrice === null || r.entryPrice === undefined ? <span className="text-fog-2">–</span> : cents(r.entryPrice)}</td>
+                    <td className="mono px-3 py-2.5 text-fog">{r.openedAfterPrint ? `${r.openedAfterPrint} of ${r.tapeSize}` : <span className="text-fog-2">{r.tapeSize} flat</span>}</td>
                     <td className="px-3 py-2.5"><span className={sidePill(r.outcome)}>{r.outcome}</span></td>
                     <td className="px-3 py-2.5 text-xs">{r.hit === null ? <span className="text-fog-2">no call</span> : r.hit ? <span className="font-semibold text-yes">hit</span> : <span className="font-semibold text-no">miss</span>}</td>
                   </tr>

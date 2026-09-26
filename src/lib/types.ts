@@ -90,6 +90,10 @@ export interface Trade {
   blockTime: number | null;
   signature: string;
   quoteAsset: string;
+  /** YES price right after this print (0..1). Known for prints decoded from the program log; the API does not send it. */
+  price?: number | null;
+  /** Where the print came from: Panta's trades endpoint, or the program's own log on chain. */
+  source?: 'api' | 'chain';
 }
 
 export interface Position {

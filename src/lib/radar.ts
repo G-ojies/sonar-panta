@@ -3,6 +3,7 @@
  * refreshRadar() is the heavy path (≈2 API calls per market) and is meant to run
  * from a cron / the agent loop; readRadar() serves cached output to requests.
  */
+import { fetchChainTape, mergeTapes, tapeIsShort, type ChainTapeCache } from './chain-tape';
 import { getMarket, getMarketTrades, isTradable, listOpenMarkets, marketYesPrice } from './panta';
 import { computeSignals } from './signals';
 import { store } from './store';
@@ -15,6 +16,7 @@ const K = {
   venue: (id: string) => `sonar:venue:${id}`,
   detail: (id: string) => `sonar:detail:${id}`,
   tape: (id: string) => `sonar:tape:${id}`,
+  chain: (id: string) => `sonar:chaintape:${id}`,
   log: 'sonar:refresh-log',
   resolved: 'sonar:resolved-ids',
   known: 'sonar:known-ids',
@@ -22,6 +24,9 @@ const K = {
 };
 /** Scans in a row a market may answer stripped with nothing cached before the registry lets it go. */
 const STRIKES_LIMIT = 6;
+/** Markets whose tape is rebuilt from chain in one scan. Each costs one signature list plus one getTransaction per print on a public RPC. */
+const CHAIN_TAPES_PER_SCAN = Number(process.env.CHAIN_TAPES_PER_SCAN ?? 3);
+export const CHAIN_TAPE_KEY = K.chain;
 /** Ids of every resolved market a scan has passed. The catalog rotates, so the backtest replays from this. */
 export const RESOLVED_IDS_KEY = K.resolved;
 
@@ -117,12 +122,31 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   await s.set(K.strikes, strikes);
   await s.set(K.known, [...new Set([...knownIds, ...ids])].filter((id) => !drop.has(id)).slice(-2000));
 
+  // Open markets first so a live market gets its chain tape before the resolved history does.
+  details.sort((a, b) => Number(b.phase !== 'resolved') - Number(a.phase !== 'resolved'));
+  let chainBudget = CHAIN_TAPES_PER_SCAN;
   const markets = await mapLimit(details, 4, async (d): Promise<RadarMarket | null> => {
     try {
       const id = d.marketId;
       let tape: Trade[] = [];
       try { tape = (await getMarketTrades(id, 200)).items; await s.set(K.tape(id), tape, 3600); }
       catch (e) { tape = (await s.get<Trade[]>(K.tape(id))) ?? []; errors.push(`tape ${id}: ${(e as Error).message}`); }
+      // The trades endpoint is empty for most resolved markets and every graduated one, and short for others
+      // (feedback item 17). The program logs every primary order, so rebuild the tape from chain when the API
+      // returned fewer prints than the chain counts; resolved tapes never change, so they are fetched once.
+      if (tapeIsShort(tape, d.onChain?.totalTrades)) {
+        let chain = await s.get<ChainTapeCache>(K.chain(id));
+        // a resolved or graduated market takes no more primary orders: fetch its tape once. (The chain counter also
+        // includes the creator's seed at creation, which is not a print, so the merged tape can stay one short.)
+        const frozen = d.phase === 'resolved' || !!d.onChain?.isGraduated;
+        const stale = !chain || (!frozen && now - chain.ts > 3600) || (!chain.complete && now - chain.ts > 86400);
+        if (stale && chainBudget > 0) {
+          chainBudget--;
+          try { chain = await fetchChainTape(id); await s.set(K.chain(id), chain, frozen ? 90 * 86400 : 7 * 86400); }
+          catch (e) { errors.push(`chain tape ${id}: ${(e as Error).message}`); }
+        }
+        if (chain) tape = mergeTapes(tape, chain.trades);
+      }
       const yesPrice = marketYesPrice(d);
       const snaps = (await s.get<Snapshot[]>(K.snaps(id))) ?? [];
       const question = d.title || d.question || d.onChain?.question || '';
@@ -169,6 +193,11 @@ export async function readRadar(): Promise<RadarOutput | null> {
 export async function readMarket(id: string): Promise<RadarMarket | null> {
   const r = await readRadar();
   return r?.markets.find((m) => m.detail.marketId === id) ?? null;
+}
+
+/** The chain-decoded tape cached for a market, if a scan has rebuilt one. */
+export async function readChainTape(id: string): Promise<ChainTapeCache | null> {
+  return store().get<ChainTapeCache>(K.chain(id));
 }
 
 export async function readSnapshots(id: string): Promise<Snapshot[]> {

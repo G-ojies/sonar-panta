@@ -128,7 +128,7 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
           <Li>Composite in −100..100: <span className="mono text-paper">0.45·gap + 0.25·flow + 0.2·momentum + 0.1·whale</span>, discounted for thin, stale or single-wallet tape, zero after close.</Li>
         </ul>
         <div className="panel p-5">
-          <div className="text-xs uppercase tracking-wide text-fog-2">Two calls from the Panta backtest</div>
+          <div className="text-xs uppercase tracking-wide text-fog-2">Two calls from the Panta replay</div>
           <p className="mt-3 text-base leading-relaxed text-paper">“Will there be an eviction AND will the first housemate evicted from BBNaija Season 11 on Sunday, August 16, 2026…?”</p>
           <p className="mt-1 text-sm text-fog">Sonar at 60% of the tape: <span className="chip bg-no/15 text-no">NO 12</span> with YES at 12¢. Outcome: <span className="text-no">NO</span>. Hit.</p>
           <p className="mt-4 text-base leading-relaxed text-paper">“Will Max Verstappen win the 2026 Dutch Grand Prix Main Race?”</p>
@@ -163,16 +163,16 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat v="672" l="resolved Sonar signals, Kalshi + Polymarket" />
         <Stat v="57.7%" l="Sonar 30-day win rate off-chain" tone="yes" />
-        <Stat v={`${live.btHits}/${live.btCalls}`} l={`backtest hits on ${live.btMarkets} resolved Panta markets`} tone="ping" />
+        <Stat v={`${live.btHits}/${live.btCalls}`} l={`replay hits on ${live.btMarkets} resolved Panta markets`} tone="ping" />
         <Stat v={String(live.agentRuns)} l="autonomous agent runs on Panta" />
         <Stat v={String(live.markets)} l="Panta markets on the radar now" />
         <Stat v={String(live.matched)} l="matched to Polymarket / Kalshi" />
         <Stat v={String(live.agentOpen + live.agentClosed)} l={`agent positions (${live.agentWon} won of ${live.agentClosed} settled)`} />
-        <Stat v="15" l="Panta API issues documented for the team" />
+        <Stat v="17" l="Panta API issues documented for the team" />
       </div>
       <ul className="mt-8 space-y-3">
         <Li>Sonar has run live on Kalshi and Polymarket since mid-2026 (sonar.nodalytics.xyz). This build ports the engine to Panta&apos;s on-chain tape and adds what Panta does not expose.</Li>
-        <Li>The Panta backtest replays the first 60% of each resolved tape through the same function ({pct(live.btHits, live.btCalls)} hit rate). Panta&apos;s catalog is young, so the sample is small and reported as-is. The agent has been paper-trading every call since 19 September and settles against Panta&apos;s own resolutions.</Li>
+        <Li>The Panta replay walks every resolved market print by print and opens on the first non-flat read at the price the chain logged then ({pct(live.btHits, live.btCalls)} hit rate, no look-ahead). Panta&apos;s API returns no prints for most of these markets, so Sonar decodes the tape from the program log on chain. Panta&apos;s catalog is young, so the sample is small and reported as-is. The agent has been paper-trading every call since 19 September and settles against Panta&apos;s own resolutions.</Li>
       </ul>
       <Src>Live numbers above are read from the running radar {live.updatedAt ? `(last scan ${new Date(live.updatedAt * 1000).toUTCString()})` : ''}.</Src>
     </div>,

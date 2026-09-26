@@ -109,16 +109,17 @@ export function MarketView({ id }: { id: string }) {
           </section>
 
           <section className="card overflow-hidden">
-            <h2 className="border-b border-line px-5 py-4 font-medium">Trade tape <span className="text-xs font-normal text-fog-2">last {tape.length} prints</span></h2>
-            {tape.length === 0 ? <p className="p-5 text-sm text-fog">No trades yet. The first print shows here the moment it lands.</p> : (
+            <h2 className="border-b border-line px-5 py-4 font-medium">Trade tape <span className="text-xs font-normal text-fog-2">last {tape.length} prints{tape.some((t) => t.source === 'chain') ? ` · ${tape.filter((t) => t.source === 'chain').length} decoded from the program log` : ''}</span></h2>
+            {tape.length === 0 ? <p className="p-5 text-sm text-fog">{Number(oc?.totalTrades ?? 0) > 0 ? `Panta's API returns none of this market's ${oc?.totalTrades} prints. The next scan decodes them from the program log.` : 'No trades yet. The first print shows here the moment it lands.'}</p> : (
               <div className="max-h-96 overflow-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-ink-2 text-left uppercase tracking-wide text-fog-2"><tr><th className="px-4 py-2 font-medium">Side</th><th className="px-2 py-2 font-medium">Shares</th><th className="px-2 py-2 font-medium">Wallet</th><th className="px-2 py-2 font-medium">When</th><th className="px-2 py-2 font-medium">Tx</th></tr></thead>
+                  <thead className="sticky top-0 bg-ink-2 text-left uppercase tracking-wide text-fog-2"><tr><th className="px-4 py-2 font-medium">Side</th><th className="px-2 py-2 font-medium">Shares</th><th className="px-2 py-2 font-medium">YES after</th><th className="px-2 py-2 font-medium">Wallet</th><th className="px-2 py-2 font-medium">When</th><th className="px-2 py-2 font-medium">Tx</th></tr></thead>
                   <tbody className="mono">
                     {tape.map((t) => (
                       <tr key={t.id} className="border-t border-line/60">
                         <td className={`px-4 py-1.5 ${t.side === 'yes' ? 'text-yes' : 'text-no'}`}>{t.kind === 'claim' ? 'claim' : t.side.toUpperCase()}</td>
                         <td className="px-2 py-1.5">{Number(t.shares).toFixed(2)}</td>
+                        <td className="px-2 py-1.5 text-fog">{t.price === null || t.price === undefined ? '—' : cents(t.price)}</td>
                         <td className="px-2 py-1.5 text-fog">{short(t.wallet)}</td>
                         <td className="px-2 py-1.5 text-fog">{t.blockTime ? `${ago(now - t.blockTime)} ago` : '—'}</td>
                         <td className="px-2 py-1.5"><a href={explorerTx(t.signature)} target="_blank" rel="noopener noreferrer" aria-label="View transaction">{short(t.signature, 3)}</a></td>

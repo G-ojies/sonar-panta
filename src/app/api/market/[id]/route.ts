@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getMarket, getMarketTrades, isTradable, marketYesPrice } from '@/lib/panta';
-import { readMarket, readSnapshots } from '@/lib/radar';
+import { mergeTapes } from '@/lib/chain-tape';
+import { readChainTape, readMarket, readSnapshots } from '@/lib/radar';
 import { computeSignals } from '@/lib/signals';
 import { fail, isPubkey } from '../../_util';
 
@@ -8,13 +9,15 @@ export const dynamic = 'force-dynamic';
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   if (!isPubkey(params.id)) return NextResponse.json({ error: 'BAD_ID' }, { status: 400 });
   try {
-    const [cached, snaps] = await Promise.all([readMarket(params.id), readSnapshots(params.id)]);
+    const [cached, snaps, chain] = await Promise.all([readMarket(params.id), readSnapshots(params.id), readChainTape(params.id)]);
     // Always fetch a fresh detail + tape so the page reflects the chain, but reuse the venue match from the radar.
     let stale = false;
-    const [detail, tape] = await Promise.all([
+    const [detail, apiTape] = await Promise.all([
       getMarket(params.id).catch((e) => { if (!cached) throw e; stale = true; return cached.detail; }), // transient Panta failure: serve the last scan
       getMarketTrades(params.id, 200).then((r) => r.items).catch(() => cached?.tape ?? []),
     ]);
+    // the trades endpoint misses most prints (feedback item 17); add the ones a scan decoded from the program log
+    const tape = chain ? mergeTapes(apiTape, chain.trades) : apiTape;
     const now = Date.now() / 1000;
     // Panta's detail endpoint sometimes returns a stripped row (blank title, no onChain state).
     // Fill blanks from the last scan so the page never loses the question, rule or chain state.

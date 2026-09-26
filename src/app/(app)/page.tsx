@@ -147,7 +147,7 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
           </section>
           {bt && bt.calls > 0 && (
             <Link href="/agent" className="card block p-5 no-underline hover:border-fog-2 hover:no-underline">
-              <div className="text-[11px] uppercase tracking-wide text-fog-2">Backtest on resolved markets</div>
+              <div className="text-[11px] uppercase tracking-wide text-fog-2">Replay on resolved markets</div>
               <div className="mono mt-1 text-lg font-semibold text-paper">{bt.hits} of {bt.calls} calls hit</div>
               <div className="text-xs text-fog">{bt.markets} markets replayed · {bt.flat} flat · see the agent&apos;s record</div>
             </Link>

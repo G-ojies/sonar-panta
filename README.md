@@ -59,7 +59,8 @@ Production: https://sonarpanta.xyz, a Render free web service defined in `render
 
 - `src/lib/signals.ts` is pure: detail row + tape + snapshots + venue match → `SignalSet`. No I/O, trivially testable.
 - `src/lib/agent.ts` runs the loop: refresh, settle resolved positions, open new ones, optional live execution.
-- `src/lib/backtest.ts` replays the first 60% of each resolved tape through the same function and compares with the outcome.
+- `src/lib/chain-tape.ts` rebuilds a market's tape from the program log on chain (`getSignaturesForAddress` + `getTransaction`, no IDL) wherever Panta's trades endpoint returns fewer prints than the chain counts.
+- `src/lib/backtest.ts` replays the agent's rule print by print over every resolved market (walk-forward, no look-ahead) and settles each call against the outcome.
 - `src/lib/store.ts` picks Upstash, a JSON file, or memory at runtime.
 
 ## How the signal is built
@@ -74,7 +75,7 @@ For each market Sonar pulls the last 200 prints and computes, on the last 24h (o
 
 Composite score in −100..100 = 0.45·gap + 0.25·flow + 0.2·momentum + 0.1·whale (weights shift to flow when no venue match), then discounted for thin, stale or single-wallet tape and zeroed after close. |score| < 12 is FLAT; ≥ 45 with ≥ 5 prints is high confidence.
 
-The **backtest** replays the first 60% of each resolved market's tape through the same function and compares the call with Panta's outcome. Panta's catalog is young, so the sample is small and reported as-is. The **agent** has paper-traded every call since 19 September 2026 and settles against Panta's own resolutions.
+The **replay** walks every resolved market print by print, asks Sonar for its read after each print, opens a one-dollar position on the first non-flat read at the YES price the chain logged at that moment, and settles it against Panta's outcome. Panta's trades endpoint returns no prints for most resolved markets and every graduated one, so the tape is decoded from the program's own log on chain. Panta's catalog is young, so the sample is small and reported as-is. The **agent** has paper-traded every call since 19 September 2026 and settles against Panta's own resolutions.
 
 ## Documents
 
