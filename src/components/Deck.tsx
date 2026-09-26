@@ -129,10 +129,10 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
         </ul>
         <div className="panel p-5">
           <div className="text-xs uppercase tracking-wide text-fog-2">Two calls from the Panta replay</div>
-          <p className="mt-3 text-base leading-relaxed text-paper">“Will there be an eviction AND will the first housemate evicted from BBNaija Season 11 on Sunday, August 16, 2026…?”</p>
-          <p className="mt-1 text-sm text-fog">Sonar at 60% of the tape: <span className="chip bg-no/15 text-no">NO 12</span> with YES at 12¢. Outcome: <span className="text-no">NO</span>. Hit.</p>
-          <p className="mt-4 text-base leading-relaxed text-paper">“Will Max Verstappen win the 2026 Dutch Grand Prix Main Race?”</p>
-          <p className="mt-1 text-sm text-fog">Sonar: <span className="chip bg-no/15 text-no">NO 13</span> with YES at 11¢. Outcome: <span className="text-no">NO</span>. Hit. The same question traded on Polymarket (match 0.74), which is where the cross-venue gap comes from when both are open.</p>
+          <p className="mt-3 text-base leading-relaxed text-paper">“Will Jannik Sinner win the Wimbledon 2026 Championship?”</p>
+          <p className="mt-1 text-sm text-fog">Sonar after the 4th of 38 prints: <span className="chip bg-yes/15 text-yes">YES 12</span> at 52¢. Outcome: <span className="text-yes">YES</span>. Hit. All 38 prints decoded from the program log; Panta&apos;s API returned none.</p>
+          <p className="mt-4 text-base leading-relaxed text-paper">“Will France win the FIFA World Cup 2026?”</p>
+          <p className="mt-1 text-sm text-fog">Sonar after the 6th of 21 prints: <span className="chip bg-no/15 text-no">NO 12</span> with NO at 56¢. Outcome: <span className="text-no">NO</span>. Hit. Same rule the agent runs live, replayed with no look-ahead.</p>
           <p className="mt-4 text-xs text-fog-2">The matcher only pairs questions that share a subject (a name, a ticker, a specific number). No match is reported rather than a wrong one.</p>
         </div>
       </div>

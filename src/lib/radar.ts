@@ -142,8 +142,9 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
         const stale = !chain || (!frozen && now - chain.ts > 3600) || (!chain.complete && now - chain.ts > 86400);
         if (stale && chainBudget > 0) {
           chainBudget--;
-          try { chain = await fetchChainTape(id); await s.set(K.chain(id), chain, frozen ? 90 * 86400 : 7 * 86400); }
-          catch (e) { errors.push(`chain tape ${id}: ${(e as Error).message}`); }
+          try { chain = await fetchChainTape(id, { concurrency: Number(process.env.CHAIN_TAPE_CONCURRENCY ?? 1) }); await s.set(K.chain(id), chain, frozen ? 90 * 86400 : 7 * 86400); }
+          // a public RPC throttles shared hosts; the tape is retried next scan and the API tape stands meanwhile
+          catch (e) { skipped.push(`chain tape ${id}: ${(e as Error).message}, retried next scan`); }
         }
         if (chain) tape = mergeTapes(tape, chain.trades);
       }
