@@ -72,7 +72,7 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
   return [
     // 1 — title
     <div key="t" className="flex h-full flex-col justify-center">
-      <div className="mb-6 flex items-center gap-3 text-sm text-fog"><span className="ping-dot" aria-hidden /> GreYat Labs · Lagos, Nigeria</div>
+      <div className="mb-6 flex items-center gap-3 text-sm text-fog"><span className="ping-dot" aria-hidden /> GreYat Labs · Benin City, Nigeria</div>
       <Big>Sonar <span className="text-fog-2">for</span> Panta</Big>
       <p className="mt-6 max-w-3xl text-xl leading-relaxed text-fog sm:text-2xl">The intelligence layer for on-chain prediction markets. Behavioural signals, cross-venue pricing and one-click non-custodial trading, built on the Panta API on Solana.</p>
       <div className="mt-10 flex flex-wrap gap-2 text-xs">
@@ -88,13 +88,13 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
           <Li>Prediction markets became infrastructure in 2026: Kalshi and Polymarket cleared <strong className="text-paper">$44.8B in a single month</strong> (June). Almost all of it off-chain, US-centric, permissioned.</Li>
           <Li>Panta puts permissionless market creation and trading on Solana behind a clean API. But an integrator gets a price and a tape, not history, not analytics, not a view of whether a Panta market is cheap or rich versus the rest of the world.</Li>
           <Li>Traders, creators and bots on Panta fly blind. Thin catalogs stay thin because nobody can see where the edge is.</Li>
-          <Li>Nigeria has <strong className="text-paper">~60M active bettors</strong> and a <strong className="text-paper">$3.6B</strong> betting market, football-first and 83% mobile, and <strong className="text-paper">zero</strong> on-chain markets about Nigerian events.</Li>
+          <Li>Nigeria has <strong className="text-paper">~60M active bettors</strong> and a <strong className="text-paper">$3.6B</strong> betting market, football-first and 83% mobile, and <strong className="text-paper">no venue</strong> where anyone can create a market on a Nigerian data release.</Li>
         </ul>
         <div className="grid grid-cols-2 gap-3 self-start">
           <Stat v="$44.8B" l="Kalshi + Polymarket, June 2026" />
           <Stat v="0" l="price-history endpoints on Panta" tone="no" />
           <Stat v="60M" l="active bettors in Nigeria" />
-          <Stat v="0" l="Nigerian markets on Panta today" tone="no" />
+          <Stat v="6" l="Nigerian market specs ready to list" />
         </div>
       </div>
       <Src>Sources: TRM Labs and CoinLaw prediction-market volume trackers (June 2026); GeoPoll “Betting in Africa 2026”; NAN / BusinessDay Nigeria betting market reports (2026). Panta API observations from docs/PANTA-API-FEEDBACK.md.</Src>
@@ -179,7 +179,7 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
 
     // 7 — why Nigeria
     <div key="ng">
-      <H kicker="Impact · Nigeria">The first Nigerian prediction markets, on Solana, priced honestly.</H>
+      <H kicker="Impact · Nigeria">Nigerian prediction markets anyone can create, on Solana, priced honestly.</H>
       <div className="grid gap-8 lg:grid-cols-2">
         <ul className="space-y-4">
           <Li>Nigerians already price everything: CBN rate decisions, the NBS inflation print, the naira, NGX, Super Eagles fixtures, fuel prices. Today that happens on bookmakers with a 10–20% overround and in naira that loses value while the bet is open.</Li>
@@ -225,9 +225,9 @@ function buildSlides(live: LiveStats): React.ReactNode[] {
 
     // 10 — team + ask
     <div key="tm" className="flex h-full flex-col justify-center">
-      <H kicker="Team">Great Ojietohamen · GreYat Labs, Lagos</H>
+      <H kicker="Team">Great Ojietohamen · GreYat Labs, Benin City</H>
       <ul className="space-y-3">
-        <Li>Solo founder-engineer. Ships trading infrastructure on Solana: onchain-rbac (Solana Foundation grant), smart-tx-stack, worldcup-match-vault (trustless TxLINE settlement), GroupStage.</Li>
+        <Li>Solo founder-engineer. Ships trading infrastructure on Solana: onchain-rbac, smart-tx-stack, worldcup-match-vault (trustless TxLINE settlement), GroupStage.</Li>
         <Li>Runs Sonar, a live behavioural-signal engine on Kalshi and Polymarket with a public track record.</Li>
         <Li>Everything in this repository was written during the hackathon window against the Panta API. MIT licensed. Signal design carried over from the author&apos;s off-chain product and disclosed.</Li>
       </ul>

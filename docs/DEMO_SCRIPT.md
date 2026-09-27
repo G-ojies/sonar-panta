@@ -4,7 +4,7 @@ Colosseum wants two videos: a **pitch** (≤ 3 min: team, problem, why, market, 
 
 ## Pitch (≤ 3:00)
 
-**0:00 – 0:20 · Who.** "I'm Great, GreYat Labs, Lagos. I build trading infrastructure on Solana; I run Sonar, a behavioural-signal engine that's been live on Kalshi and Polymarket since mid-2026 — 672 resolved signals, 57.7% 30-day win rate."
+**0:00 – 0:20 · Who.** "I'm Great, GreYat Labs, Benin City. I build trading infrastructure on Solana; I run Sonar, a behavioural-signal engine that's been live on Kalshi and Polymarket since mid-2026 — 672 resolved signals, 57.7% 30-day win rate."
 
 **0:20 – 0:50 · Problem.** "Prediction markets are becoming infrastructure. Panta gives any app a market-creation and trading API on Solana. But an API gives you prices, not intelligence: no history, no tape analytics, no idea whether a Panta market is cheap or expensive versus the rest of the world. Traders, creators and bots all fly blind."
 

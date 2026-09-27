@@ -83,8 +83,17 @@ Composite score in −100..100 = 0.45·gap + 0.25·flow + 0.2·momentum + 0.1·w
 
 The **replay** walks every resolved market print by print, asks Sonar for its read after each print, opens a one-dollar position on the first non-flat read at the YES price the chain logged at that moment, and settles it against Panta's outcome. Panta's trades endpoint returns no prints for most resolved markets and every graduated one, so the tape is decoded from the program's own log on chain. Panta's catalog is young, so the sample is small and reported as-is. The **agent** has paper-traded every call since 19 September 2026 and settles against Panta's own resolutions.
 
+## Tests
+
+```bash
+npm test
+```
+
+34 tests, no network and no API key needed. They cover the parts the record depends on: the signal engine (a YES tape and a NO tape mirror each other, a closed market never produces a call), the replay (prints added after the opening print cannot change the call, so there is no look-ahead), the decoder that reads orders from the Solana program log, the cross-venue matcher (including the false match that was fixed), and the Nigeria board specs. CI runs typecheck, lint and tests on every push.
+
 ## Documents
 
+- [docs/COMPETITIVE-LANDSCAPE.md](docs/COMPETITIVE-LANDSCAPE.md): the other Panta entries, analytics tools on other venues, Nigerian incumbents, with sources.
 - [docs/BUSINESS-PLAN.md](docs/BUSINESS-PLAN.md): problem, product, model, go-to-market, market size, competition, risks, ask.
 - [docs/PANTA-API-FEEDBACK.md](docs/PANTA-API-FEEDBACK.md): fifteen issues and gaps found during the build, with reproductions.
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md): pitch and technical demo video scripts.
@@ -101,4 +110,4 @@ The signal design comes from Sonar, the author's existing prediction-market prod
 
 ## Author
 
-Great Ojietohamen, GreYat Labs, Lagos ([@G-ojies](https://github.com/G-ojies)).
+Great Ojietohamen, GreYat Labs, Benin City ([@G-ojies](https://github.com/G-ojies)).

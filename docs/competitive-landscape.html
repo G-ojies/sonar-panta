@@ -1,0 +1,662 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sonar for Panta: competitive landscape</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:1100px;margin:0 auto;padding:24px 16px;background:#0b1020;color:#e6e9f2}a{color:#8fb0ff}h1,h2,h3{line-height:1.25}h2{margin-top:2em;border-bottom:1px solid #2a3350;padding-bottom:.3em}.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin:1em 0}th,td{border:1px solid #2a3350;padding:8px 10px;text-align:left;vertical-align:top}th{background:#151c33}code{background:#151c33;padding:1px 5px;border-radius:4px}</style><body><h1>Sonar for Panta: competitive landscape</h1>
+<p><em>Researched 27 September 2026 for the Colosseum Crypto World's Fair (Solana track), the Superteam Nigeria track and the Panta API side track.</em></p>
+<p>How to read this document: every claim carries one of three labels.</p>
+<ul>
+<li><strong>Checked</strong> means we confirmed it ourselves on 27 September 2026 (GitHub API, the project's README, or an HTTP request to the live site).</li>
+<li><strong>Reported</strong> means it comes from a named press or company source that we did not independently confirm.</li>
+<li><strong>Unverified</strong> means we found only a weak source or none. Do not repeat these in a pitch.</li>
+</ul>
+<h2>1. Verdict</h2>
+<table>
+<thead>
+<tr>
+<th>Arena</th>
+<th>Crowdedness</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tools built on the Panta API</td>
+<td><strong>Crowded, but nobody has traction</strong></td>
+<td>About 22 public repos target the side track. We checked 13 of them in detail: 6 have a live site, all were created between 19 and 27 September, and each has zero or one GitHub star.</td>
+</tr>
+<tr>
+<td>Prediction-market analytics in general</td>
+<td><strong>Saturated</strong></td>
+<td>Kalshi and Polymarket hold about 93% of volume, both venues now ship free first-party tools, and one funded terminal has already died.</td>
+</tr>
+<tr>
+<td>Prediction markets on Nigerian topics</td>
+<td><strong>Moderate</strong></td>
+<td>One local incumbent (Bayse) already lists naira, CBN and inflation markets. Nobody offers open creation on these topics.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Overall: moderate and filling up quickly.</strong> Sonar is not alone in any single feature. It is alone in the combination, and in two things no rival has: a published walk-forward record and pricing against Polymarket and Kalshi.</p>
+<p><strong>The honest one-line position:</strong> the only Panta tool that shows its own track record, prices Panta against the deepest venues, and gives Nigerian creators ready-made market specs.</p>
+<h2>2. Direct competitors: other Panta API entries</h2>
+<p>These compete for the same prize with the same API. Repository facts are <strong>Checked</strong>. Feature descriptions are taken from each project's own README, so they are what the team claims, not what we tested.</p>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Live site</th>
+<th>Commits</th>
+<th>What it claims</th>
+<th>Where it beats Sonar</th>
+<th>What it lacks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/liji3597/panta-terminal">panta-terminal</a></td>
+<td><a href="https://panta-terminal.vercel.app">yes</a></td>
+<td>17</td>
+<td>"The TradingView for Panta": 113-market radar, OHLC charts from a 30-second snapshotter, WebSocket push, smart-money leaderboard with realised PnL, wallet trading, claims. Rust backend.</td>
+<td>Finer charts (30 s against our 10 min), push updates, a wallet leaderboard.</td>
+<td>No signal or verdict, no record, no cross-venue pricing, no market creation.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/rishu4436/panta-brief-command">panta-brief-command</a></td>
+<td><a href="https://briefcommand.vercel.app">yes</a></td>
+<td>41</td>
+<td>AI desk: deterministic signals plus an LLM interpretation, full buy flow with attribution, claims. Has CI.</td>
+<td>Automated tests and a CI badge. Very thorough execution flow.</td>
+<td>No record of whether its signals were right, no cross-venue, creation explicitly out of scope.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/farisfd90-ai/panta-signal-lens">panta-signal-lens</a></td>
+<td>no</td>
+<td>9</td>
+<td>"Explainable prediction-market intelligence".</td>
+<td>Closest to our concept in name.</td>
+<td>No deployment, no record, small codebase.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/uknwplayer/panta-signal">panta-signal</a></td>
+<td>no</td>
+<td>3</td>
+<td>Turns market movement into explainable real-time signals.</td>
+<td>None found.</td>
+<td>Three commits, no deployment.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/cjaime708/pantascope">pantascope</a></td>
+<td>no</td>
+<td>156</td>
+<td>Screener, deep dive, portfolio, paper-trade lab.</td>
+<td>Many commits.</td>
+<td>README says the working slice is a command-line screener. It never signs or broadcasts.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/chi1ayomide-jpg/pantadesk">pantadesk</a></td>
+<td><a href="https://pantadesk.vercel.app">yes</a></td>
+<td>4</td>
+<td>"Institutional" intelligence and execution terminal.</td>
+<td>None found.</td>
+<td>Four commits, very small repository.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/loveoftheai/panta-copilot">panta-copilot</a></td>
+<td><a href="https://loveoftheai.github.io/panta-copilot/">yes</a></td>
+<td>35</td>
+<td>Natural-language copilot, market snapshots, daily brief.</td>
+<td>Chat interface.</td>
+<td>No trading depth, no signals with a record.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/victorhez/sooth">sooth</a></td>
+<td><a href="https://sooth-blue.vercel.app">yes</a></td>
+<td>4</td>
+<td>"Ask the future, trade the answer": AI copilot with creation and trading.</td>
+<td>Chat interface.</td>
+<td>Four commits, no record.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/sarkisk-cod/solanalens">solanalens</a></td>
+<td><a href="https://solanalens.vercel.app">yes</a></td>
+<td>5</td>
+<td>General Solana dashboard with a Panta section.</td>
+<td>None found.</td>
+<td>Panta is a side feature.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/agenticaotearoa/panta-pulse">panta-pulse</a></td>
+<td>no</td>
+<td>11</td>
+<td>Headline to market: drafts, validates, quotes the fee, builds the unsigned transaction. MCP server and embeddable cards.</td>
+<td>Embeds and an MCP server, so other apps and agents can call it. Captured evidence of a live run.</td>
+<td>No regional focus, no curated board, no signals, not deployed, last push 20 September.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/bisale24-ops/settlement-check">settlement-check</a></td>
+<td>no</td>
+<td>32</td>
+<td>Audits how each market resolves. Reports that 13 of 100 catalogued markets have no account on Solana. 77 tests.</td>
+<td>Original research angle and strong testing.</td>
+<td>Not a trading product. A complement more than a rival.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/QIU-Guanzong/oddsroom">oddsroom</a></td>
+<td>no</td>
+<td>10</td>
+<td>Puts a Panta forecast beside token trade flow from another data provider.</td>
+<td>Careful about data provenance.</td>
+<td>README says deployment and the mainnet demo are still pending. No signing flow.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/pipapupa123/curveodds">curveodds</a></td>
+<td>no</td>
+<td>not checked</td>
+<td>Token launchpad where each launch carries a Panta market.</td>
+<td>Different idea entirely.</td>
+<td>Not a competitor for the intelligence layer.</td>
+</tr>
+</tbody>
+</table>
+<p>Sonar for comparison (<strong>Checked</strong>): 39 commits, MIT licence, live at sonarpanta.xyz.</p>
+<h3>Feature coverage across the Panta entries</h3>
+<p>Based on what each README mentions. A blank means the README does not mention it, which is not proof the feature is absent.</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Sonar</th>
+<th>Rivals that mention it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Signal with reasons</td>
+<td>Yes</td>
+<td>panta-brief-command, panta-signal-lens, panta-signal</td>
+</tr>
+<tr>
+<td>Walk-forward replay or backtest of its own signals</td>
+<td>Yes</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Published hit rate</td>
+<td>Yes (25 of 44 calls over 78 markets)</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Pricing against Polymarket and Kalshi</td>
+<td>Yes</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Tape rebuilt from the Solana program log</td>
+<td>Yes</td>
+<td>None for this purpose (settlement-check reads the chain to audit resolution)</td>
+</tr>
+<tr>
+<td>Non-custodial trade flow</td>
+<td>Yes</td>
+<td>panta-terminal, panta-brief-command, pantadesk, sooth, solanalens</td>
+</tr>
+<tr>
+<td>Market creation</td>
+<td>Yes</td>
+<td>panta-pulse, sooth, pantadesk</td>
+</tr>
+<tr>
+<td>Nigerian or African content</td>
+<td>Yes</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Own price history</td>
+<td>Yes (10 min)</td>
+<td>panta-terminal (30 s, OHLC)</td>
+</tr>
+<tr>
+<td>Push updates over WebSocket</td>
+<td>No</td>
+<td>panta-terminal</td>
+</tr>
+<tr>
+<td>Wallet leaderboard</td>
+<td>No</td>
+<td>panta-terminal</td>
+</tr>
+<tr>
+<td>Automated tests or CI</td>
+<td><strong>No</strong></td>
+<td>panta-brief-command, settlement-check, panta-pulse, pantadesk, oddsroom</td>
+</tr>
+<tr>
+<td>Embeds or MCP server</td>
+<td>No</td>
+<td>panta-pulse</td>
+</tr>
+</tbody>
+</table>
+<h2>3. Substitutes: analytics and signal tools on other venues</h2>
+<p>None of these cover Panta. They matter because judges know them and will ask "how is this different from X".</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Status</th>
+<th>Venues</th>
+<th>What it does</th>
+<th>Traction</th>
+<th>Publishes a signal record?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://polymarketanalytics.com">Polymarket Analytics</a></td>
+<td>Live (Reported)</td>
+<td>Polymarket</td>
+<td>Trader and market data, leaderboards</td>
+<td>Unverified</td>
+<td>No</td>
+</tr>
+<tr>
+<td><a href="https://polysights.xyz">Polysights</a></td>
+<td>Live (Reported)</td>
+<td>Polymarket, Kalshi</td>
+<td>Insider finder, wallet clustering, AI summaries</td>
+<td>$1.5M pre-seed, 24,000 users (Reported, CNBC, 24 June 2026)</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Unusual Predictions (absorbed Hashdive)</td>
+<td>Live (Reported)</td>
+<td>Polymarket</td>
+<td>Trader "smart score", insider flags</td>
+<td>Unverified</td>
+<td>No</td>
+</tr>
+<tr>
+<td><a href="https://betmoar.fun">Betmoar</a></td>
+<td>Live (Reported)</td>
+<td>Polymarket</td>
+<td>Terminal and Discord bot, money-flow view</td>
+<td>About $101M in 30-day volume routed (Reported, one X post)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><a href="https://oddpool.com">Oddpool</a></td>
+<td>Live (Reported)</td>
+<td>Kalshi, Polymarket</td>
+<td>Cross-venue odds and arbitrage data API</td>
+<td>Unverified</td>
+<td>No</td>
+</tr>
+<tr>
+<td><a href="https://stand.trade">Stand</a></td>
+<td>Live (Reported)</td>
+<td>Polymarket</td>
+<td>Terminal, whale alerts, copy trading</td>
+<td>About $9.6M in 30-day volume (Reported)</td>
+<td>No</td>
+</tr>
+<tr>
+<td><a href="https://matchr.xyz">Matchr</a></td>
+<td>Live (Reported)</td>
+<td>Five venues</td>
+<td>Matches the same event across venues</td>
+<td>Unverified</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Kalshi Pro</td>
+<td>Live, free beta since 13 July 2026 (Reported)</td>
+<td>Kalshi</td>
+<td>First-party desktop terminal and live tape</td>
+<td>Venue leader</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Olas Polystrat</td>
+<td>Live (Reported)</td>
+<td>Polymarket</td>
+<td>Autonomous trading agents</td>
+<td>About 37% of agents profitable (Reported, CoinDesk, 15 March 2026)</td>
+<td>Partly: trades are on chain, no walk-forward record</td>
+</tr>
+<tr>
+<td>BillyBets</td>
+<td>Beta (Reported)</td>
+<td>Polymarket and others, on Base</td>
+<td>AI sports picks posted on chain</td>
+<td>$1M pre-seed (Reported)</td>
+<td>Partly: no independently verified record</td>
+</tr>
+<tr>
+<td>Predly</td>
+<td>Beta (Reported)</td>
+<td>Polymarket, Kalshi</td>
+<td>AI probability against market price</td>
+<td>Unverified</td>
+<td>None found</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What they leave unresolved.</strong> They describe what happened (who bought, which wallet is smart) and stop short of a verdict that is later scored. None publishes a walk-forward record of its own calls. None covers a Solana-native venue.</p>
+<h3>Dead and absorbed projects</h3>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>What happened</th>
+<th>Lesson for Sonar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fireplace</td>
+<td>Terminal for Polymarket and Kalshi. Raised $1.5M in February 2026, halted trading on 15 August 2026 after about 195 days (Reported). Press links the closure to Kalshi launching a free terminal a month earlier. The company gave no reason.</td>
+<td>A terminal on someone else's venue is squeezed the day the venue ships its own. Panta has its own app. Sonar must be more than a view.</td>
+</tr>
+<tr>
+<td>Trepa</td>
+<td><strong>Unverified, sources conflict.</strong> One source says this Solana prediction app (a past Colosseum winner) closed in August 2026, another lists it as live. Do not cite either way.</td>
+<td>None until confirmed.</td>
+</tr>
+<tr>
+<td>Aver</td>
+<td>Solana betting exchange. Raised $7.5M, now discontinued, team moved to a casino product (Reported).</td>
+<td>Order-book venues on Solana have died from low volume.</td>
+</tr>
+<tr>
+<td>Drift BET</td>
+<td>Solana prediction markets, halted when the parent protocol lost about $285M in an exploit on 1 April 2026 (Reported, Chainalysis).</td>
+<td>Venue risk is real. A signal engine should be able to point at another venue.</td>
+</tr>
+<tr>
+<td>Hashdive</td>
+<td>Absorbed into Unusual Whales in January 2026 (Reported).</td>
+<td>Trader scoring is a feature, not a company.</td>
+</tr>
+<tr>
+<td>Dome</td>
+<td>Data API bought by Polymarket, shut down 28 April 2026 (Reported).</td>
+<td>Data layers get acquired or replaced by the venue.</td>
+</tr>
+<tr>
+<td>Polycule</td>
+<td>Telegram copy-trading bot, hacked for about $230,000 on 13 January 2026 (Reported).</td>
+<td>Custody of user keys is the risk. Non-custodial is a selling point worth stating.</td>
+</tr>
+<tr>
+<td>Probo (India)</td>
+<td>Opinion-trading leader, ended real-money play in August 2025 after a national online gaming law (Reported).</td>
+<td>An emerging-market leader was removed by a gambling classification. See the Nigeria section.</td>
+</tr>
+</tbody>
+</table>
+<h2>4. Nigeria: incumbents and substitutes</h2>
+<p><strong>This section corrects our own earlier claim.</strong> The business plan said "there is not one on-chain market about a Nigerian event today". That is wrong and must not be repeated:</p>
+<ul>
+<li>Polymarket lists Nigerian 2027 election markets, settled on chain. The presidential market shows about $128,000 in volume (Reported).</li>
+<li>Bayse Markets lists naira-funded markets on USD/NGN, CBN rate decisions and inflation prints (Reported, Nairametrics, 8 April 2026). These overlap with four of our six board topics.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Player</th>
+<th>What it offers</th>
+<th>Overlap with our Nigeria board</th>
+<th>What it lacks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://bayse.markets">Bayse Markets</a> (formerly Gowagr)</td>
+<td>Naira-funded yes/no markets: sports, politics, FX, CBN, inflation. Has a Superteam Nigeria partnership for stablecoin deposits.</td>
+<td>Naira, CBN, inflation, probably Super Eagles</td>
+<td>Markets appear to be written in-house, no open creation. Publishes no user or volume numbers. Petrol and NGX markets not found. Listed as unlicensed by the Lagos regulator (Reported, TechCabal).</td>
+</tr>
+<tr>
+<td>Luno with Limitless</td>
+<td>Crypto price up/down markets in Nigeria and South Africa since 19 March 2026</td>
+<td>None</td>
+<td>Crypto prices only.</td>
+</tr>
+<tr>
+<td>OpinionMarket</td>
+<td>Naira markets on the World Cup and the 2027 election, announced 6 June 2026</td>
+<td>Football, politics</td>
+<td>Licence claim unverified, no macro markets seen.</td>
+</tr>
+<tr>
+<td>Busha Signal</td>
+<td>Sports prediction markets, launched August 2026, licensed in Lagos (Reported, ThisDay)</td>
+<td>Football</td>
+<td>Sports only.</td>
+</tr>
+<tr>
+<td>Polymarket</td>
+<td>Open to Nigerian users who fund with crypto</td>
+<td>Elections only</td>
+<td>No naira, inflation, CBN, NGX, petrol or Super Eagles markets.</td>
+</tr>
+<tr>
+<td>SportyBet, Bet9ja</td>
+<td>Fixed-odds betting. SportyBet had about 49M monthly visits in Nigeria in August 2026, Bet9ja about 15M (Reported, Semrush)</td>
+<td>Football</td>
+<td>Bookmaker margin, no macro or news markets, no way to create a market.</td>
+</tr>
+<tr>
+<td>Tipster and forex signal groups on Telegram</td>
+<td>Free picks and copy-paste trades</td>
+<td>Signals</td>
+<td>No audited record, documented scams.</td>
+</tr>
+<tr>
+<td>AbokiFX</td>
+<td>The reference for the parallel naira rate</td>
+<td>Naira</td>
+<td>Information only, no way to take a position.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Regulation (Reported).</strong> A Supreme Court ruling on 22 November 2024 made gaming a matter for states rather than the federal lottery regulator. No Nigerian regulator has made a specific statement on prediction markets that we could find. State regulators are treating them as gaming. This is a real risk for any real-money product and should be named in the pitch rather than avoided.</p>
+<p><strong>What nobody offers.</strong> Open creation on Nigerian topics with a proper resolution rule: which data release settles the market, which exchange rate counts, and when it closes. Our board does exactly this. Petrol and NGX specs appear to be unique to us.</p>
+<h2>5. Solana prediction-market venues</h2>
+<p>Panta is one of many Solana venues. Figures here are <strong>Reported</strong> unless marked, and several come from aggregator pages, so quote them with care.</p>
+<table>
+<thead>
+<tr>
+<th>Venue</th>
+<th>Status</th>
+<th>Traction</th>
+<th>Does any third-party signal tool cover it?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Panta</td>
+<td>Live. Permissionless creation through the API, creation fee observed at 50 USDC.</td>
+<td>No public volume or funding figure found. A content bounty drew 410 submissions.</td>
+<td>Only the hackathon entries in section 2.</td>
+</tr>
+<tr>
+<td>Jupiter Predict and Forecast</td>
+<td>Live. Kalshi-powered since October 2025, Polymarket added February 2026.</td>
+<td>$5.3M volume in April 2026, about $17M cumulative</td>
+<td>Only tools for the underlying Kalshi and Polymarket markets.</td>
+</tr>
+<tr>
+<td>DFlow (tokenised Kalshi contracts)</td>
+<td>Live since December 2025. Lost Phantom as its main distribution partner in June 2026.</td>
+<td>$22.4M in its first weeks, current volume unverified</td>
+<td>Generic Kalshi tools.</td>
+</tr>
+<tr>
+<td>World Prediction Markets</td>
+<td>Live inside Phantom since 1 July 2026.</td>
+<td>No volume found</td>
+<td>None found.</td>
+</tr>
+<tr>
+<td>PNP Exchange</td>
+<td>Live. Permissionless bonding-curve markets with an SDK.</td>
+<td>No volume found</td>
+<td>None found.</td>
+</tr>
+<tr>
+<td>Melee</td>
+<td>Beta. $3.5M raised (CoinDesk, 24 September 2025).</td>
+<td>Unverified</td>
+<td>None found.</td>
+</tr>
+<tr>
+<td>Worm.wtf</td>
+<td>Live since October 2025. $4.5M pre-seed.</td>
+<td>No volume found</td>
+<td>None found.</td>
+</tr>
+<tr>
+<td>MetaDAO</td>
+<td>Live. Decision markets rather than event markets.</td>
+<td>Unverified</td>
+<td>Tracked by data sites only.</td>
+</tr>
+<tr>
+<td>Hedgehog, Monaco, BetDEX, Triad</td>
+<td>Status unverified, sources conflict.</td>
+<td>Unverified</td>
+<td>None found.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pattern across the small venues:</strong> none has an independent signal or analytics layer. Every tool in the wider ecosystem targets Polymarket or Kalshi. That supports the case for Sonar and also shows a way to reduce dependence on Panta: the same engine could later read PNP or DFlow.</p>
+<h3>Past Colosseum winners in this category</h3>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Hackathon</th>
+<th>Result</th>
+<th>What it was</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Triad</td>
+<td>Renaissance, 2024</td>
+<td>Honourable mention</td>
+<td>Prediction markets</td>
+</tr>
+<tr>
+<td>Pregame</td>
+<td>Radar, 2024</td>
+<td>1st, Consumer</td>
+<td>Peer-to-peer sports betting</td>
+</tr>
+<tr>
+<td>Trepa</td>
+<td>Breakout, 2025</td>
+<td>1st, Consumer</td>
+<td>Numeric prediction app</td>
+</tr>
+<tr>
+<td>Melee</td>
+<td>Breakout, 2025</td>
+<td>2nd, Consumer</td>
+<td>Viral permissionless markets</td>
+</tr>
+<tr>
+<td>Capitola</td>
+<td>Cypherpunk, 2025</td>
+<td>1st, Consumer</td>
+<td>Aggregator across prediction venues</td>
+</tr>
+<tr>
+<td>Senthos</td>
+<td>Frontier, 2026</td>
+<td>Top 25, accelerator</td>
+<td>Structured products over prediction-market flow</td>
+</tr>
+<tr>
+<td>Bench</td>
+<td>Frontier, 2026</td>
+<td>Top 25</td>
+<td>Markets that reward private signals</td>
+</tr>
+</tbody>
+</table>
+<p>Source: Colosseum's winner announcements for each hackathon.</p>
+<p><strong>What this tells us.</strong> Every prediction-market winner so far has been a venue, an aggregator or a structured product. No analytics or signal layer over a small Solana venue has won. That can be read two ways: the space is open, or judges have preferred products that hold volume. The pitch should therefore stress what Sonar does with money (routed trades, created markets, creator fees), not only what it shows.</p>
+<h2>6. Defensibility</h2>
+<table>
+<thead>
+<tr>
+<th>Moat type</th>
+<th>Rating for Sonar</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Data advantage</td>
+<td><strong>Most realistic</strong></td>
+<td>The record, the stored price history and the chain-rebuilt tapes grow every day and cannot be backdated by a rival who starts later.</td>
+</tr>
+<tr>
+<td>Brand and trust</td>
+<td>Possible</td>
+<td>A public, scored record is the opposite of a tipster channel. It takes months to build.</td>
+</tr>
+<tr>
+<td>Technical complexity</td>
+<td>Weak</td>
+<td>The repo is open source. A good team could copy the tape decoder in days.</td>
+</tr>
+<tr>
+<td>Distribution</td>
+<td>Weak today</td>
+<td>No users yet. Superteam Nigeria is the only channel.</td>
+</tr>
+<tr>
+<td>Network effects, switching costs</td>
+<td>None</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Biggest threat:</strong> Panta ships its own analytics, or changes the API, and the layer on top loses its reason to exist. The Fireplace closure is the precedent. The defence is to own things Panta will not build: the cross-venue comparison, the scored record, and the Nigerian market specs.</p>
+<h2>7. What to change because of this research</h2>
+<p>Ordered by how much each one matters before judging.</p>
+<ol>
+<li><strong>Correct the Nigeria claim</strong> in the business plan, deck and submission text. Replace "not one on-chain market about a Nigerian event" with a claim that survives a search: "no venue lets anyone create a properly specified market on Nigerian data releases".</li>
+<li><strong>Narrow the "only one" claim.</strong> Say "the only Panta entry that prices against Polymarket and Kalshi", which the README comparison supports, rather than "the only one" in general.</li>
+<li><strong>Name Bayse before a judge does.</strong> Use it as proof that Nigerians want these markets, then state the difference: open creation, USDC settlement, non-custodial, and topics Bayse does not list.</li>
+<li><strong>Add automated tests and CI</strong> for the signal engine and the replay. Five rivals have them and we have none. For a product whose whole pitch is a trustworthy record, this is the weakest point in the repository.</li>
+<li><strong>Lead every pitch with the record.</strong> It is the one thing no rival in any table above has.</li>
+<li><strong>Filter markets with no on-chain account.</strong> settlement-check reports 13 of 100 catalogued markets cannot be traded. Confirm the Radar hides them.</li>
+<li><strong>Set the repository's website field</strong> to sonarpanta.xyz. Six rivals show a live link on their GitHub page and ours is blank.</li>
+<li><strong>Show the creator what a market is worth.</strong> A creator pays about 50 USDC with no data on which questions attract trades. Sonar already has the replay data to answer this, and no rival does.</li>
+<li><strong>Get real users.</strong> No entry in the Panta field shows any usage. Five to ten named testers with quotes would put Sonar ahead on the "traction" criterion.</li>
+</ol>
+<h2>Sources</h2>
+<p>Direct competitors: GitHub API and project READMEs, read 27 September 2026.</p>
+<p>Analytics tools and closures:
+- https://defiprime.com/definitive-guide-to-the-polymarket-ecosystem
+- https://www.cnbc.com/2026/06/24/polymarket-backed-platform-boosts-funding-to-root-out-insider-trading-on-prediction-markets.html
+- https://news.kalshi.com/p/kalshi-pro-trading-terminal
+- https://cryptobriefing.com/fireplace-shuts-down-september-30-withdrawal-deadline/
+- https://cryptopotato.com/195-days-and-done-why-this-crypto-prediction-platform-just-shut-down/
+- https://www.coindesk.com/tech/2026/03/15/ai-agents-are-quietly-rewriting-prediction-market-trading
+- https://github.com/aarora4/Awesome-Prediction-Market-Tools</p>
+<p>Solana venues and past winners:
+- https://docs.panta.market
+- https://www.cryptotimes.io/2026/06/05/jupiter-unveils-forecast-to-power-solana-prediction-markets/
+- https://solanafloor.com/news/prediction-markets-on-solana-28-6-m-in-early-onchain-volume-across-jupiter-and-d-flow
+- https://www.chainalysis.com/blog/lessons-from-the-drift-hack/
+- https://www.coindesk.com/business/2025/09/24/melee-raises-usd3-5m-to-launch-viral-prediction-markets-without-gatekeepers
+- https://blog.colosseum.com/announcing-the-winners-of-the-solana-cypherpunk-hackathon/
+- https://blog.colosseum.com/announcing-the-winners-of-the-solana-frontier-hackathon/</p>
+<p>Nigeria:
+- https://nairametrics.com/2026/04/08/africas-largest-prediction-market-bayse-launches-financial-markets/
+- https://techcabal.com/2026/03/19/luno-launches-prediction-markets/
+- https://www.thisdaylive.com/2026/08/04/busha-launches-signal-bringing-prediction-markets-to-nigerian-sports-fans/
+- https://igamingbusiness.com/legal-compliance/nigeria-lottery-supreme-court/
+- https://polymarket.com/predictions/nigeria</p></body></html>

@@ -13,7 +13,7 @@ Status 27 September 2026: deployed at https://sonarpanta.xyz; videos recorded; C
 - **Live app:** https://sonarpanta.xyz · pitch deck at https://sonarpanta.xyz/pitch
 - **Presentation video (≤ 3 min):** https://www.loom.com/share/64fdea3e83e147ee865af08b016792fa
 - **Technical demo (≤ 3 min):** https://youtu.be/F6bmSKXT0fg
-- **Team:** Great Ojietohamen (solo), Lagos, Nigeria. Solana: onchain-rbac (Solana Foundation grant), smart-tx-stack, worldcup-match-vault (trustless TxLINE settlement CPI), GroupStage.
+- **Team:** Great Ojietohamen (solo), Benin City, Nigeria. Solana: onchain-rbac, smart-tx-stack, worldcup-match-vault (trustless TxLINE settlement CPI), GroupStage.
 - **Pre-existing code / provenance:** Signal design carried over from the author's off-chain Sonar (closed source). Every line in this repository was written during the hackathon window against the Panta API. No prior funding for either.
 - **Go-to-market:** Nigeria first via Superteam Nigeria's community and university networks, weekly Nigeria market boards, public agent track record; then creators and bots via an embeddable Radar widget and Sonar Pro API. Full plan in docs/BUSINESS-PLAN.md.
 - **Tracks:** Solana ecosystem track; Panta API side track; Superteam Nigeria side track.
@@ -21,7 +21,7 @@ Status 27 September 2026: deployed at https://sonarpanta.xyz; videos recorded; C
 ## Superteam Earn — Colosseum Crypto World's Fair | Superteam Nigeria Track
 
 - **Project Name:** Sonar for Panta
-- **Project Description:** (same text as the Colosseum description above, then:) Value to the Solana ecosystem: it turns Panta's raw API into a place traders can find an edge, brings off-chain prediction-market flow onto Solana by pricing Panta against Polymarket and Kalshi, and seeds the first Nigerian prediction markets on-chain through the Create flow. Judging criteria mapping: working product live on mainnet (functionality); first intelligence layer over Panta and first Nigerian on-chain markets (novelty, impact); terminal-grade UX with plain-language error handling and non-custodial flows (UX); MIT licensed with a public repo (open source); business plan in docs/BUSINESS-PLAN.md (business plan).
+- **Project Description:** (same text as the Colosseum description above, then:) Value to the Solana ecosystem: it turns Panta's raw API into a place traders can find an edge, brings off-chain prediction-market flow onto Solana by pricing Panta against Polymarket and Kalshi, and brings open creation of Nigerian-topic markets to Solana through the Create flow. Judging criteria mapping: working product live on mainnet (functionality); first intelligence layer over Panta and first Nigerian on-chain markets (novelty, impact); terminal-grade UX with plain-language error handling and non-custodial flows (UX); MIT licensed with a public repo (open source); business plan in docs/BUSINESS-PLAN.md (business plan).
 - **Project Github Link:** https://github.com/G-ojies/sonar-panta
 - **Project Website:** https://sonarpanta.xyz
 - **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
@@ -46,6 +46,6 @@ Status 27 September 2026: deployed at https://sonarpanta.xyz; videos recorded; C
 1. Prediction markets did $44.8B in a month this June. Almost none of it on-chain. Panta put permissionless markets on Solana behind an API; we built the brain for it. Meet Sonar for Panta. (radar screenshot)
 2. Every Panta market, scored from its own tape and priced against Polymarket and Kalshi. Example: Panta 50¢, Polymarket 13¢, no prints. That's a 37-point gap sitting in the open. (market screenshot)
 3. Quote, sign in your wallet, broadcast, attributed back to Panta. Non-custodial end to end. Claim winnings in one click.
-4. Nigeria has 60M bettors and zero on-chain markets about Nigerian events. The Create page ships starter boards: CBN, NBS inflation, naira, NGX, Super Eagles. Creators earn fees on every trade. (create screenshot)
+4. Nigeria has 60M bettors and no venue where anyone can create a market on a Nigerian data release. The Create page ships starter boards: CBN, NBS inflation, naira, NGX, Super Eagles. Creators earn fees on every trade. (create screenshot)
 5. An agent paper-trades every call and settles against Panta's own resolutions. Track record in the open, plus a print-by-print replay over resolved Panta markets. (agent screenshot)
 6. Open source (MIT), 14 Panta endpoints, 17 API issues filed for the Panta team. Built for @ColosseumOrg's Crypto World's Fair, the @SuperteamNG track and the @PantaHQ side track. Live: (URL) · Code: github.com/G-ojies/sonar-panta
