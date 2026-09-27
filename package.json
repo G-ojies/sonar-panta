@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
     "agent": "tsx scripts/agent.ts",
     "snapshot": "tsx scripts/snapshot.ts",
     "postinstall": "node scripts/fix-types.js"
