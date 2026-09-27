@@ -23,8 +23,14 @@ Every write is non-custodial: Panta builds instructions, the user's wallet signs
 
 <p>
 <img src="public/screens/market.png" width="49%" alt="Market page: Sonar read, cross-venue block, resolution rule, tape and trade panel" />
-<img src="public/screens/agent.png" width="49%" alt="Agent page: paper positions and the backtest over resolved Panta markets" />
+<img src="public/screens/agent.png" width="49%" alt="Agent page: the walk-forward replay over resolved Panta markets" />
 </p>
+<p>
+<img src="public/screens/create-board.png" width="49%" alt="Create page: a Nigeria board loaded as the draft and quoted in sandbox mode" />
+<img src="public/screens/nigeria-desk.png" width="24%" alt="Radar: the Nigeria desk with this week's board" />
+</p>
+
+The **Nigeria board** is six questions Nigerians argue about every week, each written as a complete Panta market (rule, sources, dates) in `src/lib/boards.ts`; one click loads it on Create, and all six have been through Panta's sandbox create flow. See [docs/NIGERIA-BOARD.md](docs/NIGERIA-BOARD.md).
 
 ## Zero-cost demo (sandbox mode)
 
