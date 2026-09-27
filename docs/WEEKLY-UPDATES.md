@@ -71,7 +71,25 @@ matcher reports no match rather than a wrong one."
 
 ## Week 3 (from 2 October)
 
-"Sonar for Panta, week three. Since last time: [pick three of] the pitch and demo videos are up; the first Nigeria starter markets were drafted through the Create flow; the agent has now settled N paper calls against Panta's resolutions, here is the record [show Agent]; feedback from the Superteam Nigeria pitch review led to [change]. Next: final submission on 6 October and the Superteam NG demo day."
+Colosseum takes weekly updates as posts on the project's Builder updates feed (one per project per 24 h, 4,000 characters, up to 4 images). Post the text below with two images: `public/screens/agent.png` (the replay record) and `public/screens/create-board.png` (a board loaded on Create in sandbox). Then reply to the X launch thread with the first paragraph and the link.
+
+### Post text
+
+Sonar for Panta, week three.
+
+The agent had run 130 times without a single call, and the reason turned out to be Panta's API, not the engine. The trades endpoint returns no prints for most markets (63 of the 85 resolved ones on the radar, and every graduated market), so Sonar was scoring empty tapes. The Panta program on Solana logs every order it executes, with the exact YES price after each print, so Sonar now reads the tape straight from the program log wherever the API is short. 811 prints across 77 markets came back in one pass, with the one number the API never sends.
+
+That made a real track record possible. The backtest is now a walk-forward replay of the agent's own rule: every resolved market is walked print by print, Sonar is asked for its read after each one, the first non-flat read opens a one-dollar position at the price the chain logged, and it settles against Panta's outcome. No look-ahead. Result: 78 markets, 44 calls, 25 hits (57%), break-even per dollar. Both numbers are on the Agent page, row by row.
+
+The first Nigeria board is drafted: six questions Nigerians argue about every week (the CBN rate after the 350-point cut, the September inflation print, the naira, the NGX, the Super Eagles in Guinea-Bissau, the Dangote pump price), each written as a complete Panta market with a rule that names the source and the threshold. One click loads it on Create; all six quoted and registered in Panta's sandbox. Creating them for real is 50 USDC each, so they wait for a creator with capital.
+
+Also this week: feedback item 17 filed with the Panta team (the empty trades endpoint, with the log format an indexer could read), 17 issues in total; the pitch and demo videos are up; the site moved to sonarpanta.xyz.
+
+Next: final submission on 6 October, the Superteam Nigeria pitch reviews and demo day.
+
+### 60-second video script (optional)
+
+"Sonar for Panta, week three. The agent never called because Panta's API returns no trades for most markets, so Sonar now reads the tape from the program log on chain [show a market page: N prints decoded from the program log]. That gave the engine a real record: a print-by-print replay over 78 resolved markets, 25 of 44 calls hit [show Agent]. And the first Nigeria board is drafted, six questions with a rule and a source, one click on Create, all six through Panta's sandbox [show Create with a board loaded]. Next: submission on 6 October and the Superteam Nigeria demo day."
 
 ## Week 4 (from 9 October, final)
 

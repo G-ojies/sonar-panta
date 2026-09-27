@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { readRadar, readRefreshLog, readSnapshots } from '@/lib/radar';
 import { readBacktest } from '@/lib/backtest';
+import { BOARDS, BOARD_WEEK } from '@/lib/boards';
 import { RadarTable } from '@/components/RadarTable';
 import { LiveChart } from '@/components/LiveChart';
 import { SideChip, ConfidenceDots } from '@/components/SignalBadge';
@@ -139,11 +140,23 @@ export default async function RadarPage({ searchParams }: { searchParams?: { top
                 ))}
               </ol>
             ) : (
-              <>
-                <p className="text-sm leading-relaxed text-fog">Panta&apos;s public API lists no market about Nigeria yet: nothing on the CBN, the naira, inflation, the NGX or the Super Eagles. The first creator to list one earns a share of every trade it attracts.</p>
-                <Link href="/create" className="btn mt-3 w-full">Create the first Nigerian market</Link>
-              </>
+              <p className="text-sm leading-relaxed text-fog">Panta&apos;s public API lists no market about Nigeria yet: nothing on the CBN, the naira, inflation, the NGX or the Super Eagles.</p>
             )}
+            <div className="mt-3 border-t border-line pt-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs font-semibold text-paper">This week&apos;s board</span>
+                <span className="text-[11px] text-fog-2">{BOARD_WEEK}</span>
+              </div>
+              <ul className="mt-1.5 space-y-1">
+                {BOARDS.map((b) => (
+                  <li key={b.id} className="flex items-center gap-2 text-xs">
+                    <Link href={`/create?board=${b.id}`} className="min-w-0 flex-1 truncate text-fog no-underline hover:text-paper hover:underline" title={b.question}>{b.title}</Link>
+                    <span className="mono shrink-0 text-[11px] text-fog-2">{b.category}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-[11px] leading-relaxed text-fog-2">Six questions drafted with a rule and a source, ready to quote on Create. The first creator to list them earns a share of every trade they attract.</p>
+            </div>
           </section>
           {bt && bt.calls > 0 && (
             <Link href="/agent" className="card block p-5 no-underline hover:border-fog-2 hover:no-underline">

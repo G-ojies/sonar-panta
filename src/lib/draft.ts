@@ -7,7 +7,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 export interface Draft {
   question: string; title: string; description: string; resolutionRule: string; sourcesOfTruth: string[];
-  category: string; endTime: number; resolutionTime: number; marketType: 'standard' | 'breaking'; rationale: string; via: 'claude' | 'template';
+  category: string; endTime: number; resolutionTime: number; marketType: 'standard' | 'breaking'; rationale: string; via: 'claude' | 'template' | 'board';
 }
 
 const CATS = ['sports', 'crypto', 'politics', 'entertainment', 'finance', 'science', 'world', 'other'];

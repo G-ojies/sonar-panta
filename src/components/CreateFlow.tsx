@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import type { CreateBuild, CreateQuote } from '@/lib/types';
 import type { Draft } from '@/lib/draft';
+import { BOARDS, BOARD_WEEK, boardById } from '@/lib/boards';
 import { broadcast, deserialize, explorerTx } from '@/lib/solana';
 import { marketUrl } from '@/lib/panta-public';
 import { postJson } from './useApi';
@@ -22,14 +23,6 @@ const CATS = ['sports', 'crypto', 'politics', 'entertainment', 'finance', 'scien
  * markets: the drafter turns one into a question + resolution rule, and you edit before quoting.
  */
 const STARTERS: { group: string; items: string[] }[] = [
-  { group: 'Nigeria', items: [
-    'CBN Monetary Policy Committee: will the MPR be held unchanged at the next meeting?',
-    'NBS inflation report: will September 2026 headline inflation print below the August figure?',
-    'Naira: will the official NFEM closing rate on 31 October 2026 be stronger than its 30 September close?',
-    'NGX All-Share Index: will it close October 2026 above its September close?',
-    'Super Eagles: will Nigeria win its next competitive fixture?',
-    'PMS pump price: will NNPC or Dangote announce a petrol price cut before 31 October 2026?',
-  ] },
   { group: 'Global', items: [
     'Will Bitcoin close above its 1 October 2026 open on 31 October 2026 (Coinbase daily close)?',
     'Will the Fed change the federal funds target range at its next FOMC meeting?',
@@ -52,6 +45,18 @@ export function CreateFlow() {
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<{ marketId: string; sig: string } | null>(null);
   const busy = !['idle', 'done'].includes(step);
+
+  /** A board is a complete spec: load it as the draft, no model in the loop. `/create?board=nbs` deep-links one. */
+  function loadBoard(id: string) {
+    const b = boardById(id);
+    if (!b) return;
+    const { id: _id, label: _label, context: _context, imageUrl: img, ...spec } = b;
+    setInput(b.question); setDraft(spec); setImageUrl(img); setQuote(null); setResult(null); setErr(null);
+  }
+  useEffect(() => {
+    try { const id = new URLSearchParams(window.location.search).get('board'); if (id) loadBoard(id); } catch { /* no window */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function doDraft() {
     setErr(null); setStep('drafting'); setQuote(null);
@@ -109,6 +114,16 @@ export function CreateFlow() {
           <button className="btn btn-primary shrink-0" disabled={busy || input.trim().length < 8} onClick={doDraft}>{step === 'drafting' ? 'Drafting…' : 'Draft market'}</button>
         </div>
         <div className="mt-4 space-y-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11px] uppercase tracking-wide text-fog-2">Nigeria board</span>
+            {BOARDS.map((b) => (
+              <button key={b.id} type="button" onClick={() => loadBoard(b.id)} title={b.question}
+                className={`rounded-md border px-2 py-1 text-left text-xs ${draft?.via === 'board' && draft.question === b.question ? 'border-ping text-paper' : 'border-line text-fog hover:border-fog-2 hover:text-paper'}`}>
+                {b.label}
+              </button>
+            ))}
+            <span className="text-[11px] text-fog-2">{BOARD_WEEK} · complete specs, rule and sources included</span>
+          </div>
           {STARTERS.map((g) => (
             <div key={g.group} className="flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-[11px] uppercase tracking-wide text-fog-2">{g.group}</span>
@@ -120,7 +135,7 @@ export function CreateFlow() {
               ))}
             </div>
           ))}
-          <p className="text-xs text-fog-2">Panta lists no African markets yet. Creators earn a share of every trade their market attracts, so the first Nigerian boards are open ground.</p>
+          <p className="text-xs text-fog-2">Panta lists no market about Nigeria yet. The board above is six questions Nigerians argue about every week, each written with a rule Panta can settle. Creators earn a share of every trade their market attracts.</p>
         </div>
       </section>
 
