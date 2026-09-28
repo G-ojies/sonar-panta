@@ -95,7 +95,7 @@ npm test
 
 - [docs/COMPETITIVE-LANDSCAPE.md](docs/COMPETITIVE-LANDSCAPE.md): the other Panta entries, analytics tools on other venues, Nigerian incumbents, with sources.
 - [docs/BUSINESS-PLAN.md](docs/BUSINESS-PLAN.md): problem, product, model, go-to-market, market size, competition, risks, ask.
-- [docs/PANTA-API-FEEDBACK.md](docs/PANTA-API-FEEDBACK.md): fifteen issues and gaps found during the build, with reproductions.
+- [docs/PANTA-API-FEEDBACK.md](docs/PANTA-API-FEEDBACK.md): seventeen issues and gaps found during the build, with reproductions.
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md): pitch and technical demo video scripts.
 - [docs/SUBMISSION.md](docs/SUBMISSION.md): answers for the Colosseum, Superteam Nigeria and Panta forms.
 - [docs/DEPLOY.md](docs/DEPLOY.md): Vercel + Upstash + GitHub Actions.

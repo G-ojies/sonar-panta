@@ -32,14 +32,42 @@ Status 27 September 2026: deployed at https://sonarpanta.xyz; videos recorded; C
 
 ## Superteam Earn — Panta API Side Track
 
+Listing and form: https://superteam.fun/earn/listing/panta-api-side-track (deadline 13 October 2026 06:59 UTC, editable until then). Use greatojies@gmail.com.
+
 - **Project Name:** Sonar for Panta
-- **Project Description:** (Colosseum description above)
+- **Project Description:**
+
+  Sonar for Panta is a signal desk built on the Panta API. It reads the trades on every Panta market, calls a side with reasons a user can check, and lets them act on it from their own wallet.
+
+  The problem: the Panta API gives an integrator a price and a trade list. It does not give price history, a read on who is buying, or any sense of whether a market is cheap or expensive. Traders and creators work blind, so thin markets stay thin.
+
+  How the Panta API is used. Fourteen endpoints are integrated across the whole lifecycle:
+  - Discovery and data: GET /markets/ across every status and category, GET /markets/{id}/, GET /markets/{id}/trades/, GET /categories/.
+  - Trading: primaryorderquote, primaryorderbuild, primaryordersubmit, primaryorderverify, then POST /trades/ so every trade is attributed back to Panta.
+  - Positions and claims: GET /positions/, POST /claim/build/, creator-fee claims.
+  - Market creation: /markets/create/quote/, /build/ and /register/.
+
+  Every write is non-custodial. Panta builds the transaction, the user's wallet signs, Sonar broadcasts and reports the signature. The API key never reaches the browser. "Powered by Panta" is on every page.
+
+  What Sonar adds on top of the API:
+  - A signal for each market from its own trades (flow, momentum, large prints, wallet concentration), with the reasons shown.
+  - Price history, which the API does not provide, recorded every 10 minutes.
+  - The full trade record rebuilt from the Solana program log where the trades endpoint returns nothing, which is the case for most resolved markets.
+  - A price check against Polymarket and Kalshi for the same question.
+  - A Create page that turns a headline into a complete market with a resolution rule, plus a weekly Nigeria board: the naira, inflation, the CBN rate, the NGX index, the Super Eagles and petrol. All six specs have been through Panta's sandbox create flow.
+  - A sandbox mode, so anyone can try the full trade and create flow with an empty wallet.
+
+  Evidence that it works: a walk-forward replay over 124 resolved Panta markets, with no look-ahead, made 68 calls and 41 were right (60%). Every call is public on the Agent page. The engine behind it has 672 scored signals on Kalshi and Polymarket at 57.7%. The repo is MIT licensed with 34 automated tests and CI.
+
+  Feedback for the Panta team: 17 API issues found during the build are written up with reproductions in docs/PANTA-API-FEEDBACK.md.
+
 - **Project Github Link:** https://github.com/G-ojies/sonar-panta
 - **Project Website:** https://sonarpanta.xyz
 - **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
-- **Pitch deck / Loom:** https://www.loom.com/share/64fdea3e83e147ee865af08b016792fa (deck: https://sonarpanta.xyz/pitch)
-- **Did you submit to Crypto World's Fair on Colosseum?** Yes
+- **Link to your pitch deck or Loom/video presentation:** https://sonarpanta.xyz/pitch (swap in the new 2-minute pitch video once recorded; the old Loom says Lagos and carries the old Nigeria claim)
+- **Did you submit this project to the official Crypto World's Fair on Colosseum? (Yes/No):** Yes
 - **Link to Colosseum project:** https://colosseum.com/arena/projects/sonar-for-panta
+- **Link to your project's Colosseum profile:** https://colosseum.com/arena/projects/sonar-for-panta
 
 ## X launch thread (draft)
 
