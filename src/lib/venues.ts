@@ -112,9 +112,9 @@ export async function matchPolymarket(question: string, minSim = 0.55): Promise<
 interface KalshiMarket { ticker: string; event_ticker: string; title: string; yes_sub_title?: string; yes_bid?: number | null; yes_ask?: number | null; last_price?: number | null; volume_24h?: number | null; close_time?: string; status: string }
 
 let kalshiCache: { ts: number; markets: KalshiMarket[] } | null = null;
-/** Kalshi has no free-text search on the public API; pull a page of open markets and match locally. */
+/** Kalshi has no free-text search on the public API; pull its open markets (about 1.4 MB on the wire) once an hour and match locally. */
 export async function matchKalshi(question: string, minSim = 0.58): Promise<VenueMatch | null> {
-  if (!kalshiCache || Date.now() - kalshiCache.ts > 10 * 60_000) {
+  if (!kalshiCache || Date.now() - kalshiCache.ts > 60 * 60_000) {
     const pages: KalshiMarket[] = [];
     let cursor = '';
     for (let i = 0; i < 4; i++) {

@@ -4,10 +4,19 @@ import { readRadar, readRefreshLog } from '@/lib/radar';
 import { storeKind } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
+
+// The host calls this every few seconds. Panta is asked at most once in five minutes.
+let pantaSeen: { at: number; status: string } | null = null;
+async function pantaStatus(): Promise<string> {
+  if (pantaSeen && Date.now() - pantaSeen.at < 5 * 60_000) return pantaSeen.status;
+  let status: string;
+  try { const a = await getAccount(); status = `ok:${a.status}`; } catch (e) { status = `error:${(e as Error).message}`; }
+  pantaSeen = { at: Date.now(), status };
+  return status;
+}
+
 export async function GET() {
-  const [radar, log] = await Promise.all([readRadar(), readRefreshLog()]);
-  let panta: string = 'unknown';
-  try { const a = await getAccount(); panta = `ok:${a.status}`; } catch (e) { panta = `error:${(e as Error).message}`; }
+  const [radar, log, panta] = await Promise.all([readRadar(), readRefreshLog(), pantaStatus()]);
   return NextResponse.json({
     ok: true, store: storeKind(), panta, radarUpdatedAt: radar?.updatedAt ?? null, radarMarkets: radar?.markets.length ?? 0,
     lastRefresh: log[0] ?? null, cluster: process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? 'mainnet-beta',

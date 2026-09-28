@@ -217,6 +217,8 @@ export interface RadarMarket {
   venue: VenueMatch | null;
   tradable: boolean;
   updatedAt: number;
+  /** resolved, with a complete tape: the row is final and later scans carry it over untouched */
+  settled?: boolean;
 }
 
 export interface Snapshot {

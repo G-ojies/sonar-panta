@@ -15,6 +15,8 @@ function waitUntil(p: Promise<unknown>) {
 /** Held while a tick runs so a pinger that fires again early, or a GitHub run landing at the same time, does not start a second one. */
 const LOCK = 'sonar:tick-lock';
 const LOCK_TTL = 240;
+/** Least time between two scans. A little under twenty minutes, so the second of two 10-minute pings always runs. */
+const MIN_TICK_S = Number(process.env.SONAR_MIN_TICK_SECONDS ?? 1080);
 
 export async function GET() {
   const [st, bt] = await Promise.all([readAgent(), readBacktest()]);
@@ -24,7 +26,8 @@ export async function GET() {
 /**
  * One tick: refresh the radar, settle and open paper positions, re-run the backtest every sixth run.
  * Authorization: Bearer CRON_SECRET or ?key=. Answers 202 at once and finishes in the background, so
- * any pinger with a short timeout can drive it every 10 minutes; ?wait=1 blocks until the tick is done.
+ * any pinger with a short timeout can drive it; ?wait=1 blocks until the tick is done, ?force=1 runs one
+ * even if the last was recent.
  */
 export async function POST(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -33,8 +36,12 @@ export async function POST(req: NextRequest) {
   try {
     const held = await s.get<number>(LOCK);
     if (held) return NextResponse.json({ ok: true, started: false, reason: 'tick in progress', since: held }, { status: 202 });
-    await s.set(LOCK, Date.now() / 1000, LOCK_TTL);
     const prev = await readAgent();
+    // The pinger calls every 10 minutes, which also keeps the host awake. A scan runs on every second call:
+    // Panta's markets move slowly, and the host's monthly data allowance is shared with everything else.
+    const since = Date.now() / 1000 - (prev?.lastRunAt ?? 0);
+    if (since < MIN_TICK_S && req.nextUrl.searchParams.get('force') !== '1') return NextResponse.json({ ok: true, started: false, reason: 'last tick was recent', secondsAgo: Math.round(since) }, { status: 202 });
+    await s.set(LOCK, Date.now() / 1000, LOCK_TTL);
     const work = (async () => {
       try {
         const st = await runAgent();
