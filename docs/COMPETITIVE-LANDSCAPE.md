@@ -50,7 +50,7 @@ Based on what each README mentions. A blank means the README does not mention it
 | --- | --- | --- |
 | Signal with reasons | Yes | panta-brief-command, panta-signal-lens, panta-signal |
 | Walk-forward replay or backtest of its own signals | Yes | None |
-| Published hit rate | Yes (25 of 44 calls over 78 markets) | None |
+| Published hit rate | Yes (41 of 68 calls over 124 markets, as of 27 September) | None |
 | Pricing against Polymarket and Kalshi | Yes | None |
 | Tape rebuilt from the Solana program log | Yes | None for this purpose (settlement-check reads the chain to audit resolution) |
 | Non-custodial trade flow | Yes | panta-terminal, panta-brief-command, pantadesk, sooth, solanalens |

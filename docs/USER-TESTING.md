@@ -2,12 +2,14 @@
 
 Goal: 5 to 10 named testers before the 6 October submission, each with one quotable line. Testing costs nothing: sandbox mode runs the whole flow with an empty wallet.
 
+The record numbers in these messages were read from the live Agent page on 27 September 2026 (124 markets, 68 calls, 41 right). Check the page and update them before posting.
+
 ## 1. Group message (Superteam Nigeria builder Telegram)
 
 ```
 Hi all, Great here, building Sonar for the World's Fair.
 
-Sonar reads the trades on every Panta prediction market and tells you which side the flow favours, with reasons. I replayed it over 78 resolved markets: it made 44 calls and 25 were right. The same engine has 672 scored signals on Kalshi and Polymarket at 57.7%.
+Sonar reads the trades on every Panta prediction market and tells you which side the flow favours, with reasons. I replayed it over 124 resolved markets: it made 68 calls and 41 were right. The same engine has 672 scored signals on Kalshi and Polymarket at 57.7%.
 
 I need 5 people to try it for 10 minutes and tell me what is confusing. No money needed, there is a sandbox mode that works with an empty wallet.
 
@@ -33,7 +35,7 @@ I will send 4 short questions after. If you are building something too, I will g
 ```
 Looking for 5 testers.
 
-Sonar reads the trades on every @PantaHQ prediction market and calls a side, with reasons. Replayed over 78 resolved markets: 44 calls, 25 right.
+Sonar reads the trades on every @PantaHQ prediction market and calls a side, with reasons. Replayed over 124 resolved markets: 68 calls, 41 right.
 
 10 minutes, no money needed (sandbox mode).
 

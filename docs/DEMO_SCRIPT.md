@@ -1,20 +1,33 @@
 # Sonar for Panta — video scripts
 
-Colosseum wants two videos: a **pitch** (≤ 3 min: team, problem, why, market, traction) and a **technical demo** (2–3 min). The Panta and Superteam Nigeria side tracks accept a Loom or the deck at `/pitch`. Record both with Loom, screen + voice, 1080p. **Switch the header toggle to Sandbox before recording the trade, claim and create steps**: Panta's fixtures answer every call, nothing is sent on chain, and an empty wallet is enough. Say so on camera; judges reward honesty about what is live. For the Superteam NG pitch reviews (three are required, plus demo day) present `/pitch` with the arrow keys; every number on the traction slide is read live from the store.
+Colosseum wants two videos: a **pitch** (≤ 3 min allowed, 2 min advised: team, problem, why, market, traction) and a **technical demo** (2–3 min). The Panta and Superteam Nigeria side tracks accept a Loom or the deck at `/pitch`. Record both with Loom, screen + voice, 1080p. **Switch the header toggle to Sandbox before recording the trade, claim and create steps**: Panta's fixtures answer every call, nothing is sent on chain, and an empty wallet is enough. Say so on camera; judges reward honesty about what is live. For the Superteam NG pitch reviews (three are required, plus demo day) present `/pitch` with the arrow keys; every number on the traction slide is read live from the store.
 
-## Pitch (≤ 3:00)
+## Pitch (2:00)
 
-**0:00 – 0:20 · Who.** "I'm Great, GreYat Labs, Benin City. I build trading infrastructure on Solana; I run Sonar, a behavioural-signal engine that's been live on Kalshi and Polymarket since mid-2026 — 672 resolved signals, 57.7% 30-day win rate."
+About 260 spoken words, which is 1:50 at a normal pace and leaves ten seconds of slack. Colosseum asks for team, problem, why, market and traction; each is marked below. Say "traders" and "creators". The record numbers move every day: read them off the live Agent page on the day you record and change the script to match.
 
-**0:20 – 0:50 · Problem.** "Prediction markets are becoming infrastructure. Panta gives any app a market-creation and trading API on Solana. But an API gives you prices, not intelligence: no history, no tape analytics, no idea whether a Panta market is cheap or expensive versus the rest of the world. Traders, creators and bots all fly blind."
+| Time | On screen | Say |
+| --- | --- | --- |
+| 0:00 to 0:15 | You on camera, or deck slide 1 | **Team.** "I'm Great, a solo engineer in Benin City, Nigeria. I run Sonar, a signal engine for prediction markets. On Kalshi and Polymarket it has made 672 scored calls, and 57.7 percent were right." |
+| 0:15 to 0:35 | Deck slide 2 (problem) | **Problem and market.** "Prediction markets traded over 40 billion dollars in June. Very little of that is on Solana. Panta is changing this with an API that lets anyone create and trade a market. But the API gives you a price and nothing else. No history. No read on who is buying. Traders and creators work blind." |
+| 0:35 to 1:05 | Live site: Radar, then click into one market and point at the reasons and the trade panel | **Product.** "Sonar for Panta fixes that. It reads every trade on every Panta market, rebuilding the record from the Solana chain where the API has gaps. It calls a side and gives reasons you can check. It compares each price with Polymarket and Kalshi. And you can trade from the same screen, with your own wallet." |
+| 1:05 to 1:25 | Live site: Agent page, replay record | **Traction.** "Does it work? I replayed it over 124 resolved Panta markets, with no look-ahead. It made 68 calls and 41 were right. That is 60 percent. Every call is public, and the code is open source, with tests." |
+| 1:25 to 1:45 | Live site: Create page with a Nigeria board question loaded | **Why Nigeria.** "Nigerians argue about the naira, inflation and the Super Eagles every week. Local venues prove the demand, but they write every market themselves. With Sonar, anyone can create one, with a clear rule for how it settles. Six are ready this week." |
+| 1:45 to 2:00 | Deck slide 10, URL visible | **Business and close.** "Sonar will earn creator fees on the markets it lists and a share of the trades it routes. Next is a paid signal feed for bots and apps. Sonar is live now at sonarpanta.xyz." |
 
-**0:50 – 1:30 · Product.** Show Radar. "Sonar for Panta scans every market Panta exposes, scores it from its own trade tape — flow imbalance, momentum, whale prints, wallet concentration — and prices it against Polymarket and Kalshi when the same question trades there. Click through, see why, buy YES or NO non-custodially through the Panta API, claim winnings, and create new markets from a headline with Claude drafting the resolution rule. Show the Nigeria starter boards on Create: CBN, NBS inflation, naira, NGX, Super Eagles."
+### Before you record
 
-**1:30 – 2:00 · Why it matters / market.** "Panta wants prediction markets embedded everywhere. Every embed needs exactly this layer: what's mispriced, what's moving, what to route flow into. Sonar is that layer, and it's venue-neutral, so it's also the bridge that brings off-chain prediction-market liquidity onto Solana. And Nigeria: 60 million bettors, a $3.6B market, zero on-chain markets about Nigerian events. Sonar's Create page is how the first ones get listed."
+- Full-screen browser, no bookmarks bar, no Loom bubble over the content. Hide the bottom ticker.
+- Open the four tabs in order first: deck, Radar, Agent, Create. Switching tabs is faster than typing addresses.
+- Pick the market for the product section in advance: one with a clear side and at least two reasons showing.
+- One take is fine. If you stumble, pause, then repeat the whole sentence so it can be cut cleanly.
+- Rename the Loom before sharing. The automatic titles have been wrong every time.
 
-**2:00 – 2:40 · Traction.** "Sonar's off-chain track record. On Panta: an autonomous agent that's been paper-trading every medium-plus call since launch, settled against Panta's own resolutions — here's the live scoreboard — plus a backtest over resolved Panta markets. Fourteen API issues found and documented for the Panta team."
+### If a judge asks
 
-**2:40 – 3:00 · Ask / next.** "Next: live agent capital, secondary-market support when Panta ships it, and shipping the Radar as an embeddable widget for creators. Sonar for Panta is live at the link below."
+- **"What happens when Panta builds its own analytics?"** Sonar owns what Panta will not build: the comparison with other venues, a public scored record, and the Nigerian market specs. The engine can read another Solana venue.
+- **"Bayse already does Nigerian markets."** Yes, and that proves the demand. Bayse writes its own markets and holds naira. Sonar lets anyone create one, settles in USDC, and never holds funds.
+- **"Is 60 percent good?"** It is a small sample and I report it as it is. Medium-confidence calls are 12 of 24. The point is that the record is public and replayable, which no other entry offers.
 
 ## Technical demo (2–3 min)
 
