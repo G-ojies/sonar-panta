@@ -3,6 +3,7 @@ import { getMarket, getMarketTrades, isTradable, marketYesPrice } from '@/lib/pa
 import { mergeTapes } from '@/lib/chain-tape';
 import { readChainTape, readMarket, readSnapshots } from '@/lib/radar';
 import { computeSignals } from '@/lib/signals';
+import { chainHealth } from '@/lib/tape-stream';
 import { fail, isPubkey } from '../../_util';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
       getMarket(params.id).catch((e) => { if (!cached) throw e; stale = true; return cached.detail; }), // transient Panta failure: serve the last scan
       getMarketTrades(params.id, 200).then((r) => r.items).catch(() => cached?.tape ?? []),
     ]);
-    // the trades endpoint misses most prints (feedback item 17); add the ones a scan decoded from the program log
+    // the trades endpoint misses most prints (feedback item 17); add the ones a scan or the live stream decoded from the program log
     const tape = chain ? mergeTapes(apiTape, chain.trades) : apiTape;
     const now = Date.now() / 1000;
     // Panta's detail endpoint sometimes returns a stripped row (blank title, no onChain state).
@@ -30,6 +31,6 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
     const yesPrice = marketYesPrice(detail);
     const venue = cached?.venue ?? null;
     const signals = computeSignals(detail, tape, snaps, yesPrice, venue, now);
-    return NextResponse.json({ detail, yesPrice, tape, signals, venue, tradable: isTradable(detail, now), snapshots: snaps, updatedAt: stale ? cached!.updatedAt : now, stale }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ detail, yesPrice, tape, signals, venue, tradable: isTradable(detail, now), snapshots: snaps, updatedAt: stale ? cached!.updatedAt : now, stale, chain: chainHealth() }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) { return fail(e); }
 }

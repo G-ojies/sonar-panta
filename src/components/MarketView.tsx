@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import type { MarketDetail, SignalSet, Snapshot, Trade, VenueMatch } from '@/lib/types';
+import type { ChainHealth, MarketDetail, SignalSet, Snapshot, Trade, VenueMatch } from '@/lib/types';
 import { ago, cents, dateShort, short, untilText, usd } from '@/lib/format';
 import { marketUrl } from '@/lib/panta-public';
 import { explorerTx } from '@/lib/solana';
@@ -11,7 +11,7 @@ import { LiveChart } from './LiveChart';
 import { TradePanel } from './TradePanel';
 import { PoweredByPanta } from './PoweredByPanta';
 
-interface MarketPayload { detail: MarketDetail; yesPrice: number | null; tape: Trade[]; signals: SignalSet; venue: VenueMatch | null; tradable: boolean; snapshots: Snapshot[]; updatedAt: number }
+interface MarketPayload { detail: MarketDetail; yesPrice: number | null; tape: Trade[]; signals: SignalSet; venue: VenueMatch | null; tradable: boolean; snapshots: Snapshot[]; updatedAt: number; chain?: ChainHealth }
 
 export function MarketView({ id }: { id: string }) {
   const { data, error, loading, reload } = useApi<MarketPayload>(`/api/market/${id}`, [id], 30_000);
@@ -109,7 +109,10 @@ export function MarketView({ id }: { id: string }) {
           </section>
 
           <section className="card overflow-hidden">
-            <h2 className="border-b border-line px-5 py-4 font-medium">Trade tape <span className="text-xs font-normal text-fog-2">last {tape.length} prints{tape.some((t) => t.source === 'chain') ? ` · ${tape.filter((t) => t.source === 'chain').length} decoded from the program log` : ''}</span></h2>
+            <div className="border-b border-line px-5 py-4">
+              <h2 className="font-medium">Trade tape <span className="text-xs font-normal text-fog-2">last {tape.length} prints{tape.some((t) => t.source === 'chain') ? ` · ${tape.filter((t) => t.source === 'chain').length} decoded from the program log` : ''}</span></h2>
+              {data.chain?.stream.enabled && <StreamLine chain={data.chain} />}
+            </div>
             {tape.length === 0 ? <p className="p-5 text-sm text-fog">{Number(oc?.totalTrades ?? 0) > 0 ? `Panta's API returns none of this market's ${oc?.totalTrades} prints. The next scan decodes them from the program log.` : 'No trades yet. The first print shows here the moment it lands.'}</p> : (
               <div className="max-h-96 overflow-auto">
                 <table className="w-full text-xs">
@@ -137,6 +140,20 @@ export function MarketView({ id }: { id: string }) {
         </aside>
       </div>
     </div>
+  );
+}
+
+/** One quiet line under the tape header: is the program log being streamed, by whom, and what it last saw. */
+function StreamLine({ chain }: { chain: ChainHealth }) {
+  const s = chain.stream;
+  const via = s.provider === 'solami' ? 'Solami' : `${s.provider === 'custom' ? 'a custom RPC' : 'the public RPC'}${s.fallback ? ' (Solami fallback)' : ''}`;
+  return (
+    <p className="mt-1 text-xs text-fog-2">
+      <i className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${s.connected ? 'bg-ping' : 'bg-fog-2'}`} aria-hidden />
+      {s.connected
+        ? <>Program log streaming live over {via}{s.lastSlot ? <> · last Panta transaction at slot <span className="mono">{s.lastSlot.toLocaleString('en-US')}</span></> : ''}{s.prints ? ` · ${s.prints} ${s.prints === 1 ? 'print' : 'prints'} streamed since start` : ''}{chain.rpc.provider === 'solami' && s.provider !== 'solami' ? ' · tape rebuilt over Solami RPC' : ''}</>
+        : <>Program log stream reconnecting over {via}. New prints arrive with the next scan until it is back.</>}
+    </p>
   );
 }
 
