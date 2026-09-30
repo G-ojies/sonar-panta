@@ -10,7 +10,7 @@ All six were run through Panta's create flow in sandbox mode on 27 September 202
 | nbs | Will Nigeria's September 2026 headline inflation print below 15.39%? | finance | 14 Oct 12:00 | 31 Oct 23:59 |
 | naira | Will the naira close stronger than ₦1,330 per US dollar on the official market on 30 October 2026? | finance | 30 Oct 12:00 | 31 Oct 12:00 |
 | ngx | Will the NGX All-Share Index close October 2026 above 252,113.41 points? | finance | 30 Oct 12:00 | 31 Oct 12:00 |
-| eagles | Will Nigeria beat Guinea-Bissau in their AFCON 2027 qualifier on 29 September 2026? | sports (breaking) | 29 Sep 12:00 | 30 Sep 00:00 |
+| eagles | Will Nigeria be ahead of Guinea-Bissau and Madagascar in AFCON 2027 qualifying Group L after matchday 4? | sports | 9 Nov 00:00 | 21 Nov 00:00 |
 | petrol | Will Dangote's ex-gantry petrol price be below ₦1,300 per litre on 31 October 2026? | other | 31 Oct 00:00 | 1 Nov 12:00 |
 
 ## Where each number comes from
@@ -19,8 +19,12 @@ All six were run through Panta's create flow in sandbox mode on 27 September 202
 - **NBS.** Headline inflation was 15.39% year-on-year in August 2026 (15.43% in July), the third monthly fall; food 19.57%, month-on-month 0.71%. The September report is due around mid-October. Source: nigerianstat.gov.ng.
 - **Naira.** NFEM closes in the second half of September: ₦1,329.80 (21 Sep), ₦1,328.00 (23 and 24 Sep), about ₦1,326.06 (25 Sep). Parallel market ₦1,374–1,380. Source: CBN exchange-rate page.
 - **NGX.** All-Share Index 252,113.41 on Friday 25 September 2026, market capitalisation ₦163.66 trillion, +62.01% year to date after ten straight gaining sessions. Source: ngxgroup.com.
-- **Super Eagles.** AFCON 2027 qualifiers: matchday 1 at home to Madagascar in Uyo on 25 September, matchday 2 away to Guinea-Bissau on 29 September; matchdays 3 and 4 in November. Source: cafonline.com, thenff.com.
+- **Super Eagles.** AFCON 2027 qualifiers, Group L: Nigeria beat Madagascar 2–1 on 25 September and lost 3–0 away to Guinea-Bissau on 29 September, so Guinea-Bissau lead on six points with Nigeria on three. Tanzania are co-hosts and already qualified; only the best of the other three goes through. Matchdays 3 and 4 are played between 9 and 17 November. Source: cafonline.com, thenff.com.
 - **Petrol.** Dangote raised the PMS gantry price from ₦1,265 to ₦1,350 per litre on 12 September 2026 and later trimmed it to ₦1,325. Pump prices: Lagos about ₦1,385, Abuja about ₦1,430. Sources: Dangote Industries, MEMAN.
+
+## What has settled
+
+- **Super Eagles, 29 September (first board).** "Will Nigeria beat Guinea-Bissau in their AFCON 2027 qualifier on 29 September 2026?" would have resolved NO: Guinea-Bissau won 3–0 in Bissau. The slot was rewritten on 30 September as the Group L question above, and the new spec went through the sandbox the same day.
 
 ## How the rules are written
 
