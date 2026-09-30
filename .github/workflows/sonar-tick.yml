@@ -19,6 +19,7 @@ jobs:
       KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
       KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
       NEXT_PUBLIC_SOLANA_RPC: ${{ secrets.SOLANA_RPC || 'https://api.mainnet-beta.solana.com' }}
+      SOLAMI_API_KEY: ${{ secrets.SOLAMI_API_KEY }}
       SONAR_AGENT_MODE: ${{ vars.SONAR_AGENT_MODE || 'paper' }}
     steps:
       - name: Check secrets

@@ -2,7 +2,7 @@
 
 **The intelligence layer for on-chain prediction markets.** Behavioural signals, cross-venue pricing and one-click non-custodial trading for [Panta](https://panta.market) markets on Solana. _Powered by Panta._
 
-Built for Colosseum's **Crypto World's Fair 2026** (Solana ecosystem track), the **Superteam Nigeria** track and the **Panta API** side track. MIT licensed.
+Built for Colosseum's **Crypto World's Fair 2026** (Solana ecosystem track), the **Superteam Nigeria** track, the **Panta API** side track and the **Solami** side track. MIT licensed.
 
 ![Sonar radar: every Panta market scored from its tape and priced against Polymarket and Kalshi](public/screens/radar.png)
 
@@ -46,9 +46,25 @@ npm run agent                # one agent tick (refresh + open/settle paper posit
 npm run dev                  # http://localhost:3000
 ```
 
-`PANTA_TEST_API_KEY` (a `pk_test_` key) enables sandbox mode. Optional env: `KV_REST_API_URL`/`KV_REST_API_TOKEN` (Upstash, for persistence on Vercel), `ANTHROPIC_API_KEY` (Claude drafting; falls back to a template), `CRON_SECRET` (protects `/api/refresh` and `/api/agent`), `SONAR_AGENT_MODE=live` + `SONAR_AGENT_KEYPAIR` (JSON secret key) to execute real primary buys, `SONAR_STORE_FILE` for a JSON file store when running scripts locally.
+`PANTA_TEST_API_KEY` (a `pk_test_` key) enables sandbox mode. Optional env: `SOLAMI_API_KEY` (Solami as the chain data path, see below), `KV_REST_API_URL`/`KV_REST_API_TOKEN` (Upstash, for persistence on Vercel), `ANTHROPIC_API_KEY` (Claude drafting; falls back to a template), `CRON_SECRET` (protects `/api/refresh` and `/api/agent`), `SONAR_AGENT_MODE=live` + `SONAR_AGENT_KEYPAIR` (JSON secret key) to execute real primary buys, `SONAR_STORE_FILE` for a JSON file store when running scripts locally.
 
 Production: https://sonarpanta.xyz, a Render free web service defined in `render.yaml`; see [docs/DEPLOY.md](docs/DEPLOY.md). The radar refresh and agent tick run every 10 minutes: a pinger calls `POST /api/agent`, which does the work in the background and writes to Upstash; [`.github/workflows/sonar-tick.yml`](.github/workflows/sonar-tick.yml) is the fallback (GitHub throttles its cron to every few hours).
+
+## Solami: the chain data path
+
+Sonar reads Solana through [Solami](https://solami.dev) when `SOLAMI_API_KEY` is set, and through the public endpoints when it is not.
+
+- **Solami RPC** rebuilds each market's tape from the Panta program's log (`getSignaturesForAddress` + `getTransaction`), paced to the plan's request rate.
+- **Solami WebSocket** carries the live tape stream: one `logsSubscribe` filtered to the Panta program. A trade is decoded and added to its market's tape seconds after it confirms, instead of on the next scan. The socket reconnects with backoff and closes the gap after a reconnect or restart.
+- **Health is surfaced.** `/api/health` reports the provider on each path, the last slot seen, prints streamed and reconnects; every market page shows one status line under the tape.
+
+```bash
+echo "SOLAMI_API_KEY=<your key>" >> .env.local
+npm run stream                                        # watch the stream from a terminal (add -- --replay 6 to replay recent trades)
+curl -s localhost:3000/api/health | jq .chain.paths   # "RPC: Solami, stream: Solami"
+```
+
+A key on Solami's Free plan has RPC but no WebSocket, so the rebuild runs on Solami and the stream falls back to the public endpoint; the health line says so. Details, env vars and the fallback rules are in [docs/SOLAMI.md](docs/SOLAMI.md).
 
 ## Architecture
 
@@ -66,6 +82,7 @@ Production: https://sonarpanta.xyz, a Render free web service defined in `render
 - `src/lib/signals.ts` is pure: detail row + tape + snapshots + venue match → `SignalSet`. No I/O, trivially testable.
 - `src/lib/agent.ts` runs the loop: refresh, settle resolved positions, open new ones, optional live execution.
 - `src/lib/chain-tape.ts` rebuilds a market's tape from the program log on chain (`getSignaturesForAddress` + `getTransaction`, no IDL) wherever Panta's trades endpoint returns fewer prints than the chain counts.
+- `src/lib/tape-stream.ts` holds one WebSocket subscription to the program's log and appends each print to its market's stored tape as it confirms; `src/lib/solami.ts` picks the RPC and WebSocket endpoints (Solami with a key, public without).
 - `src/lib/backtest.ts` replays the agent's rule print by print over every resolved market (walk-forward, no look-ahead) and settles each call against the outcome.
 - `src/lib/store.ts` picks Upstash, a JSON file, or memory at runtime.
 
@@ -89,7 +106,7 @@ The **replay** walks every resolved market print by print, asks Sonar for its re
 npm test
 ```
 
-34 tests, no network and no API key needed. They cover the parts the record depends on: the signal engine (a YES tape and a NO tape mirror each other, a closed market never produces a call), the replay (prints added after the opening print cannot change the call, so there is no look-ahead), the decoder that reads orders from the Solana program log, the cross-venue matcher (including the false match that was fixed), and the Nigeria board specs. CI runs typecheck, lint and tests on every push.
+66 tests, no network and no API key needed. They cover the parts the record depends on: the signal engine (a YES tape and a NO tape mirror each other, a closed market never produces a call), the replay (prints added after the opening print cannot change the call, so there is no look-ahead), the decoder that reads orders from the Solana program log, the live tape stream (endpoint selection with and without a Solami key, a pushed log line becoming a stored print, reconnect backoff and the catch-up after a gap), the cross-venue matcher (including the false match that was fixed), and the Nigeria board specs. CI runs typecheck, lint and tests on every push.
 
 ## Documents
 
@@ -99,10 +116,11 @@ npm test
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md): pitch and technical demo video scripts.
 - [docs/SUBMISSION.md](docs/SUBMISSION.md): answers for the Colosseum, Superteam Nigeria and Panta forms.
 - [docs/DEPLOY.md](docs/DEPLOY.md): Vercel + Upstash + GitHub Actions.
+- [docs/SOLAMI.md](docs/SOLAMI.md): what Solami does in Sonar, env vars, running it with your own key, stream health.
 
 ## Stack
 
-Next.js 14 (app router) · TypeScript · Tailwind · `@solana/wallet-adapter` · `@solana/web3.js` · Upstash Redis (optional) · Anthropic SDK (optional) · GitHub Actions scheduler.
+Next.js 14 (app router) · TypeScript · Tailwind · `@solana/wallet-adapter` · `@solana/web3.js` · Solami RPC and WebSocket (optional) · Upstash Redis (optional) · Anthropic SDK (optional) · GitHub Actions scheduler.
 
 ## Disclosure
 
