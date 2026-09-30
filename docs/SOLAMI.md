@@ -134,6 +134,22 @@ This one is also from a run with no key: a local production build, started with 
 
 **In the app.** Open any market page. Under the "Trade tape" heading one line reports the stream: `Program log streaming live over Solami · last Panta transaction at slot 451,947,877`. Place a trade on Panta and the print appears in the tape on the page's next refresh (every 30 seconds), marked as decoded from the program log when Panta's own endpoint does not return it.
 
+## Demo script (2 to 3 minutes, live mainnet)
+
+Record after the Pro trial is redeemed and the service has restarted, so both paths read Solami. Screen only, in this order; the words are a guide, not a script to read out.
+
+| Time | Screen | Say |
+| --- | --- | --- |
+| 0:00 | Radar at sonarpanta.xyz | Sonar reads every Panta prediction market on Solana from its trade tape and calls a side. The tape is the problem: Panta's API returns no trades for most markets, so Sonar decodes them from the program's own log on chain. Solami is how it reads the chain. |
+| 0:25 | Terminal: `curl -s https://sonarpanta.xyz/api/health \| jq .chain` | Two paths, both on Solami: RPC for rebuilding a market's history, and one WebSocket subscription filtered to the Panta program for live prints. `paths` says who carries each one, and it is honest: on the Free plan this line reads "stream: public fallback". |
+| 0:55 | Terminal: `npm run stream -- --replay 6` | This is the same code the server runs. It connects to ws.solami.dev, the node confirms the subscription, and the last six real program transactions go through the decoder: side, size and the YES price after each print, mapped to their market. |
+| 1:30 | Market page of the market those prints belong to | Under Trade tape: "Program log streaming live over Solami, last Panta transaction at slot N". The prints decoded from the log are marked, next to the ones Panta's API does return. |
+| 1:55 | Agent page, replay box | Because the tape is complete, the replay can walk 124 resolved markets print by print with no look-ahead. That record only exists because the chain is readable at this rate: the public endpoint throttles the host, Solami does not. |
+| 2:20 | README, Solami section | Public repo, MIT. `SOLAMI_API_KEY` is the only variable you need, and without it the same code runs on the public endpoints, so anyone can try it. |
+| 2:40 | Health once more | Stream health: connected, provider, last slot, prints, reconnects. Everything in this video is on mainnet. |
+
+If a Panta trade lands during the recording, keep it: the print reaches the terminal within a second or two of the block, and the market page shows it on its next 30-second refresh.
+
 ## Tests
 
 `npm test` covers the URL building with and without a key, the refusal and fallback rules, the request pacing, the mapping from a pushed log line to a stored print, the reconnect backoff and the catch-up. No network and no key are needed.
