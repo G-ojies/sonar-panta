@@ -234,10 +234,10 @@ export interface StreamHealth {
   enabled: boolean;
   /** Subscribed and receiving: the socket is open and the node confirmed the log subscription. */
   connected: boolean;
-  /** Who carries the stream: Solami, a custom RPC, or the public mainnet endpoint. */
-  provider: 'solami' | 'custom' | 'public';
+  /** Who carries the stream: RPC Fast, Solami, a custom RPC, or the public mainnet endpoint. */
+  provider: 'rpcfast' | 'solami' | 'custom' | 'public';
   host: string;
-  /** Solami is configured but refused the stream, so the fallback endpoint carries it. */
+  /** A provider is configured but refused the stream, so the fallback endpoint carries it. */
   fallback: boolean;
   startedAt: number | null;
   connectedAt: number | null;
@@ -261,8 +261,8 @@ export interface StreamHealth {
 
 /** Which provider each chain path is on right now: the RPC that rebuilds tapes, and the live stream. */
 export interface ChainHealth {
-  rpc: { provider: StreamHealth['provider']; host: string; /** Solami is configured but refused the key, so the fallback answers. */ fallback: boolean };
+  rpc: { provider: StreamHealth['provider']; host: string; /** A provider is configured but refused the key, so the fallback answers. */ fallback: boolean };
   stream: StreamHealth;
-  /** The same in words, for example "RPC: Solami, stream: public fallback". */
+  /** The same in words, for example "RPC: RPC Fast, stream: RPC Fast". */
   paths: string;
 }

@@ -4,7 +4,7 @@ import bs58 from 'bs58';
 import { appendPrints, type ChainTapeCache, type Tx } from '../src/lib/chain-tape';
 import { PANTA_PROGRAM_MAINNET } from '../src/lib/panta-public';
 import { CHAIN_TAPE_KEY, KNOWN_IDS_KEY } from '../src/lib/radar';
-import { chainEndpoints, clearRefused, type ChainEndpoints } from '../src/lib/solami';
+import { chainEndpoints, clearRefused, type ChainEndpoints } from '../src/lib/chain-endpoints';
 import { TapeStream, backoffMs, marketOf, parseLogEvent, pathsLine, streamEnabled, subscribeFrame, type SocketHandlers } from '../src/lib/tape-stream';
 import { print } from './helpers';
 
@@ -273,6 +273,24 @@ test('fallback: health names the provider of each path, so a Free plan key reads
   assert.equal(pathsLine(solamiRpc, r.stream.health()), 'RPC: Solami, stream: public fallback');
   assert.equal(pathsLine({ provider: 'public', host: 'api.mainnet-beta.solana.com', fallback: true }, r.stream.health()), 'RPC: public fallback, stream: public fallback');
   assert.equal(pathsLine({ provider: 'public', host: 'api.mainnet-beta.solana.com', fallback: false }, { ...r.stream.health(), enabled: false }), 'RPC: public, stream: off');
+  clearRefused();
+});
+
+test('fallback: an RPC Fast key carries the stream on solana-rpc.rpcfast.com, and a refusal there is named as such', async () => {
+  clearRefused();
+  const r = rig({ endpoints: chainEndpoints({ RPCFAST_API_KEY: 'rf_secret' }) });
+  r.stream.start();
+  assert.equal(r.sockets[0].url, 'wss://solana-rpc.rpcfast.com/?api_key=rf_secret');
+  r.sockets[0].on.open(); r.sockets[0].on.message(ACK); await r.stream.idle();
+  assert.deepEqual([r.stream.health().connected, r.stream.health().provider, r.stream.health().host, r.stream.health().fallback], [true, 'rpcfast', 'solana-rpc.rpcfast.com', false]);
+  assert.equal(pathsLine({ provider: 'rpcfast', host: 'solana-rpc.rpcfast.com', fallback: false }, r.stream.health()), 'RPC: RPC Fast, stream: RPC Fast');
+  r.sockets[0].on.close(1006, 401); r.timers[0].fn();
+  assert.equal(r.sockets[1].url, 'wss://api.mainnet-beta.solana.com');
+  r.sockets[1].on.open(); r.sockets[1].on.message(ACK); await r.stream.idle();
+  const h = r.stream.health();
+  assert.deepEqual([h.provider, h.fallback], ['public', true]);
+  assert.match(h.note ?? '', /RPC Fast refused the stream \(HTTP 401\)/);
+  assert.ok(!JSON.stringify(h).includes('rf_secret'), 'the key never reaches the health output');
   clearRefused();
 });
 

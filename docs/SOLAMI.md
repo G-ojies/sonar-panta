@@ -7,7 +7,7 @@
 | **RPC** (`https://rpc.solami.dev/sol`) | Rebuilding a market's trade tape from the Panta program's log: `getSignaturesForAddress` for the market, then `getTransaction` for each print. Also the one `getTransaction` behind every streamed print, and the catch-up after a reconnect. | `src/lib/chain-tape.ts` |
 | **WebSocket** (`wss://ws.solami.dev/ws/sol`) | The live tape stream: one `logsSubscribe` filtered to the Panta program, so a trade reaches Sonar seconds after it confirms. | `src/lib/tape-stream.ts` |
 
-`src/lib/solami.ts` turns the environment into the two URLs. With no key, both paths use the public mainnet endpoints, which is how the app ran before and how you can try it today.
+`src/lib/chain-endpoints.ts` turns the environment into the two URLs. With no key, both paths use the public mainnet endpoints, which is how the app ran before and how you can try it today. The same module also supports [RPC Fast](RPCFAST.md); with both keys set RPC Fast is used unless `CHAIN_PROVIDER=solami`.
 
 ## Why this matters for Sonar
 

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import type { ChainHealth, MarketDetail, SignalSet, Snapshot, Trade, VenueMatch } from '@/lib/types';
 import { ago, cents, dateShort, short, untilText, usd } from '@/lib/format';
+import { PROVIDER_NAMES, isProvider } from '@/lib/chain-endpoints';
 import { marketUrl } from '@/lib/panta-public';
 import { explorerTx } from '@/lib/solana';
 import { useApi } from './useApi';
@@ -146,12 +147,14 @@ export function MarketView({ id }: { id: string }) {
 /** One quiet line under the tape header: is the program log being streamed, by whom, and what it last saw. */
 function StreamLine({ chain }: { chain: ChainHealth }) {
   const s = chain.stream;
-  const via = s.provider === 'solami' ? 'Solami' : `${s.provider === 'custom' ? 'a custom RPC' : 'the public RPC'}${s.fallback ? ' (Solami fallback)' : ''}`;
+  const name = (p: ChainHealth['rpc']['provider']) => (isProvider(p) ? PROVIDER_NAMES[p] : p === 'custom' ? 'a custom RPC' : 'the public RPC');
+  // the provider the stream fell back from is the one still answering RPC, unless that path fell back too
+  const via = `${name(s.provider)}${s.fallback ? ` (${isProvider(chain.rpc.provider) ? `${PROVIDER_NAMES[chain.rpc.provider]} ` : ''}fallback)` : ''}`;
   return (
     <p className="mt-1 text-xs text-fog-2">
       <i className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${s.connected ? 'bg-ping' : 'bg-fog-2'}`} aria-hidden />
       {s.connected
-        ? <>Program log streaming live over {via}{s.lastSlot ? <> · last Panta transaction at slot <span className="mono">{s.lastSlot.toLocaleString('en-US')}</span></> : ''}{s.prints ? ` · ${s.prints} ${s.prints === 1 ? 'print' : 'prints'} streamed since start` : ''}{chain.rpc.provider === 'solami' && s.provider !== 'solami' ? ' · tape rebuilt over Solami RPC' : ''}</>
+        ? <>Program log streaming live over {via}{s.lastSlot ? <> · last Panta transaction at slot <span className="mono">{s.lastSlot.toLocaleString('en-US')}</span></> : ''}{s.prints ? ` · ${s.prints} ${s.prints === 1 ? 'print' : 'prints'} streamed since start` : ''}{isProvider(chain.rpc.provider) && s.provider !== chain.rpc.provider ? ` · tape rebuilt over ${PROVIDER_NAMES[chain.rpc.provider]} RPC` : ''}</>
         : <>Program log stream reconnecting over {via}. New prints arrive with the next scan until it is back.</>}
     </p>
   );

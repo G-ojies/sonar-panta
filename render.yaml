@@ -35,7 +35,9 @@ services:
         sync: false
       - key: NEXT_PUBLIC_SOLANA_RPC
         sync: false
-      # optional: Solami as the chain data path (docs/SOLAMI.md); without it the public endpoints are used
+      # optional: the chain data path, RPC Fast (docs/RPCFAST.md) or Solami (docs/SOLAMI.md); without a key the public endpoints are used
+      - key: RPCFAST_API_KEY
+        sync: false
       - key: SOLAMI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY

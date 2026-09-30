@@ -2,7 +2,7 @@
  * Watch the live tape stream from a terminal.
  *   npm run stream                  # subscribe and print every Panta transaction the node pushes
  *   npm run stream -- --replay 5    # first push the program's last 5 transactions through the same decode path
- * Connects to the endpoint the server would use: Solami with SOLAMI_API_KEY set, the public one without.
+ * Connects to the endpoint the server would use: RPC Fast with RPCFAST_API_KEY set, Solami with SOLAMI_API_KEY, the public one without.
  * Reads the market registry from the store named by .env.local and writes nothing: decoded prints are printed
  * here, not stored. The server's own stream (started by /api/health) is the one that stores them.
  */
@@ -10,7 +10,7 @@ import { config as dotenv } from 'dotenv';
 dotenv({ path: '.env.local' }); dotenv();
 import { rpc, type ChainTapeCache, type Tx } from '../src/lib/chain-tape';
 import { PANTA_PROGRAM_MAINNET } from '../src/lib/panta-public';
-import { chainEndpoints, hostOf, pickEndpoint } from '../src/lib/solami';
+import { chainEndpoints, hostOf, pickEndpoint } from '../src/lib/chain-endpoints';
 import { store } from '../src/lib/store';
 import { TapeStream, openSocket, type SocketHandlers } from '../src/lib/tape-stream';
 
@@ -47,7 +47,7 @@ const stream = new TapeStream({
 
 const line = () => {
   const h = stream.health();
-  console.log(`[${at()}] health  connected=${h.connected} provider=${h.provider}${h.fallback ? ' (Solami fallback)' : ''} host=${h.host} events=${h.events} prints=${h.prints} recovered=${h.recovered} unmapped=${h.unmapped} reconnects=${h.reconnects} lastSlot=${h.lastSlot ?? '-'}${h.note ? ` note="${h.note}"` : ''}`);
+  console.log(`[${at()}] health  connected=${h.connected} provider=${h.provider}${h.fallback ? ' (fallback)' : ''} host=${h.host} events=${h.events} prints=${h.prints} recovered=${h.recovered} unmapped=${h.unmapped} reconnects=${h.reconnects} lastSlot=${h.lastSlot ?? '-'}${h.note ? ` note="${h.note}"` : ''}`);
 };
 
 (async () => {

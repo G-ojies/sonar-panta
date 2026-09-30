@@ -94,3 +94,18 @@ Next: final submission on 6 October, the Superteam Nigeria pitch reviews and dem
 ## Week 4 (from 9 October, final)
 
 "Final update. Sonar for Panta is submitted. Numbers as of today: N markets tracked, N agent calls settled, hit rate N percent, N API issues filed. Everything is open source under MIT, deployed on free tiers, with zero spend. What I'd build next with support: live agent capital, secondary-market support the day Panta ships it, and the embeddable radar for creators. Thank you for reviewing."
+
+## RPC Fast side track posts (October and November)
+
+The side track asks for two to three public posts a month about RPC Fast for two months, from @Great_ojies. Each one states something that is true on the day it goes out; nothing is pre-written as a claim.
+
+| When | Post | Proof to attach |
+| --- | --- | --- |
+| 30 Sep or 1 Oct | RPC Fast wired in as Sonar's chain data path: one host for JSON-RPC and the logsSubscribe stream, 71 tests, MIT. | Link to docs/RPCFAST.md |
+| After the key is on Render (early Oct) | The health line on RPC Fast: `RPC: RPC Fast, stream: RPC Fast`, first prints streamed, reconnects 0. | `/api/health` screenshot, `npm run stream` output |
+| Mid Oct (after Earn submission) | What the stream saw in its first two weeks: events, prints, latency from block to tape. | Health counters, a market page |
+| Late Oct | Compute-unit use for the month against the plan: real numbers from the Billing and usage page. | Dashboard screenshot |
+| Early Nov | Public endpoint vs RPC Fast: how many tape rebuilds a scan completes on each, from the refresh log. | Refresh log lines |
+| Mid or late Nov | Feedback for the RPC Fast team: what worked, what was missing, what a small data app needs from an RPC plan. | Thread |
+
+Plus replies and quotes of @rpcfast posts when there is something real to say; the side track counts those too.

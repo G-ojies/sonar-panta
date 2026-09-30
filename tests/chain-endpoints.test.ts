@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PUBLIC_RPC, chainEndpoints, clearRefused, hostOf, isRefusal, markRefused, pickEndpoint, spacer } from '../src/lib/solami';
+import { PUBLIC_RPC, RPCFAST_RPC, RPCFAST_WS, chainEndpoints, clearRefused, hostOf, isRefusal, markRefused, paceWait, pickEndpoint, spacer } from '../src/lib/chain-endpoints';
 
 test('endpoints: with no key and no override, the public mainnet endpoint carries both RPC and the stream', () => {
   const ep = chainEndpoints({});
@@ -49,12 +49,54 @@ test('endpoints: a URL copied whole from the dashboard is used as given, with no
   assert.equal(keyless.ws.provider, 'public', 'no key and no socket URL: the stream stays on the fallback endpoint');
 });
 
+test('endpoints: an RPC Fast key puts RPC and the stream on RPC Fast, one host for both, key in the query string', () => {
+  const ep = chainEndpoints({ RPCFAST_API_KEY: 'rf_key1' });
+  assert.deepEqual(ep.http, { provider: 'rpcfast', url: `${RPCFAST_RPC}?api_key=rf_key1` });
+  assert.deepEqual(ep.ws, { provider: 'rpcfast', url: `${RPCFAST_WS}?api_key=rf_key1` });
+  assert.equal(ep.http.url, 'https://solana-rpc.rpcfast.com/?api_key=rf_key1', 'the dashboard shows this exact form');
+  assert.equal(ep.ws.url, 'wss://solana-rpc.rpcfast.com/?api_key=rf_key1');
+  assert.deepEqual(ep.fallback?.http, { provider: 'public', url: PUBLIC_RPC }, 'what ran before the key is kept as the fallback');
+  assert.equal(chainEndpoints({ RPCFAST_API_KEY: ' ' }).http.provider, 'public', 'a blank key is no key');
+});
+
+test('endpoints: RPC Fast URLs copied whole from the dashboard are used as given, and the key found in one serves the other', () => {
+  const both = chainEndpoints({ RPCFAST_RPC_URL: 'https://solana-rpc.rpcfast.com/?api_key=rf_abc' });
+  assert.equal(both.http.url, 'https://solana-rpc.rpcfast.com/?api_key=rf_abc');
+  assert.equal(both.ws.url, 'wss://solana-rpc.rpcfast.com/?api_key=rf_abc', 'the socket reuses the key found in the RPC URL');
+  const ws = chainEndpoints({ RPCFAST_API_KEY: 'k', RPCFAST_WS_URL: 'wss://other.rpcfast.com/ws?x=1' });
+  assert.equal(ws.ws.url, 'wss://other.rpcfast.com/ws?x=1&api_key=k');
+  assert.equal(ws.http.url, 'https://solana-rpc.rpcfast.com/?api_key=k');
+  assert.equal(chainEndpoints({ RPCFAST_API_KEY: 'other', RPCFAST_RPC_URL: 'https://solana-rpc.rpcfast.com/?api_key=rf_abc' }).http.url, 'https://solana-rpc.rpcfast.com/?api_key=rf_abc', 'a key already in the URL is not doubled');
+});
+
+test('endpoints: with both keys RPC Fast is used, and CHAIN_PROVIDER picks explicitly when that provider is configured', () => {
+  const env = { RPCFAST_API_KEY: 'rf', SOLAMI_API_KEY: 'sm' };
+  assert.equal(chainEndpoints(env).http.provider, 'rpcfast');
+  assert.equal(chainEndpoints({ ...env, CHAIN_PROVIDER: 'solami' }).http.provider, 'solami');
+  assert.equal(chainEndpoints({ ...env, CHAIN_PROVIDER: 'Solami ' }).ws.provider, 'solami', 'case and spaces do not matter');
+  assert.equal(chainEndpoints({ ...env, CHAIN_PROVIDER: 'rpcfast' }).http.provider, 'rpcfast');
+  assert.equal(chainEndpoints({ SOLAMI_API_KEY: 'sm', CHAIN_PROVIDER: 'rpcfast' }).http.provider, 'solami', 'naming a provider with no key falls through to the one that has a key');
+  assert.equal(chainEndpoints({ RPCFAST_API_KEY: 'rf', CHAIN_PROVIDER: 'solami' }).http.provider, 'rpcfast');
+  assert.equal(chainEndpoints({ CHAIN_PROVIDER: 'rpcfast' }).http.provider, 'public');
+  assert.equal(chainEndpoints({ ...env, SOLANA_RPC: 'https://rpc.example.com' }).fallback?.http.provider, 'custom', 'the fallback is the plain endpoint, never the other provider');
+});
+
+test('pace: each provider is spaced to its own rate, and the plain endpoints are not paced', () => {
+  assert.equal(paceWait('public'), 0);
+  assert.equal(paceWait('custom'), 0);
+  const first = paceWait('rpcfast', { RPCFAST_RPS: '10' });
+  const second = paceWait('rpcfast', { RPCFAST_RPS: '10' });
+  assert.equal(first, 0, 'the first call goes at once');
+  assert.ok(second > 0 && second <= 100, `the second waits for the 100 ms slot, got ${second}`);
+  assert.equal(paceWait('solami', { SOLAMI_RPS: '4' }), 0, 'a different provider has its own gate');
+});
+
 test('hostOf: what health and logs print never carries the key', () => {
   assert.equal(hostOf(chainEndpoints({ SOLAMI_API_KEY: 'sk_secret' }).ws.url), 'ws.solami.dev');
   assert.equal(hostOf('not a url'), 'invalid-url');
 });
 
-test('refusal: a refused key moves traffic to the fallback for half an hour, then Solami is tried again', () => {
+test('refusal: a refused key moves traffic to the fallback for half an hour, then the provider is tried again', () => {
   clearRefused();
   const ep = chainEndpoints({ SOLAMI_API_KEY: 'k' });
   const t0 = 1_790_000_000_000;
@@ -65,6 +107,11 @@ test('refusal: a refused key moves traffic to the fallback for half an hour, the
   assert.equal(pickEndpoint('ws', ep, t0 + 31 * 60_000).provider, 'solami');
   markRefused('http', t0);
   assert.equal(pickEndpoint('http', chainEndpoints({}), t0).provider, 'public', 'with no key there is nothing to fall back from');
+  clearRefused();
+  const rf = chainEndpoints({ RPCFAST_API_KEY: 'k' });
+  markRefused('http', t0);
+  assert.equal(pickEndpoint('http', rf, t0 + 1000).provider, 'public', 'RPC Fast follows the same rule');
+  assert.equal(pickEndpoint('ws', rf, t0 + 1000).provider, 'rpcfast');
   clearRefused();
 });
 

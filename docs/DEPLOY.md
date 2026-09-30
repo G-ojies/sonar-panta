@@ -20,7 +20,7 @@ KV_REST_API_URL=... KV_REST_API_TOKEN=... npx tsx scripts/store-sync.ts .sonar-s
 `render.yaml` at the repo root is a Render Blueprint: one free web service running `next start`. Because it is a long-lived Node process there is no function time limit, so the 90-second tick behind `POST /api/agent` simply runs to completion, and the same 10-minute pinger that drives it keeps the free instance from sleeping.
 
 1. Render dashboard → New → Blueprint → pick the GitHub repo. Render reads `render.yaml` and creates the service.
-2. Fill the secret env vars it asks for: `PANTA_API_KEY`, `PANTA_TEST_API_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_SOLANA_RPC` (and `ANTHROPIC_API_KEY` if you want Claude drafting, `SOLAMI_API_KEY` if you want Solami as the chain data path; see [SOLAMI.md](SOLAMI.md)). The non-secret ones are in the blueprint.
+2. Fill the secret env vars it asks for: `PANTA_API_KEY`, `PANTA_TEST_API_KEY`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `CRON_SECRET`, `NEXT_PUBLIC_SOLANA_RPC` (and `ANTHROPIC_API_KEY` if you want Claude drafting, `RPCFAST_API_KEY` or `SOLAMI_API_KEY` for the chain data path; see [RPCFAST.md](RPCFAST.md) and [SOLAMI.md](SOLAMI.md)). The non-secret ones are in the blueprint.
 3. First deploy takes about five minutes. Check `https://<service>.onrender.com/api/health`.
 4. Custom domain. Register `sonarpanta.xyz` (Cloudflare Registrar or Porkbun; .xyz is a few dollars the first year) and put its DNS on Cloudflare. Render service → Settings → Custom Domains → add `sonarpanta.xyz` and `www.sonarpanta.xyz`. In Cloudflare DNS add: an **A** record, name `@`, value `216.24.57.1` (Render's apex address), and a **CNAME**, name `www`, target `sonar-panta.onrender.com`; both with the proxy **off** (DNS only) so Render can issue the certificates. Render verifies within a few minutes and serves HTTPS on both; `www` redirects to the apex. `NEXT_PUBLIC_SITE_URL` in the blueprint already points at this hostname.
 5. Point the pinger (section 3a) at `https://sonarpanta.xyz/api/agent`.
@@ -58,7 +58,7 @@ gh secret set PANTA_API_KEY      --body "pk_live_..."
 gh secret set KV_REST_API_URL    --body "https://....upstash.io"
 gh secret set KV_REST_API_TOKEN  --body "..."
 gh secret set SOLANA_RPC         --body "https://..."      # optional
-gh secret set SOLAMI_API_KEY     --body "..."              # optional: tape rebuilds over Solami RPC
+gh secret set RPCFAST_API_KEY    --body "..."              # optional: tape rebuilds over RPC Fast (or SOLAMI_API_KEY for Solami)
 gh workflow run sonar-tick                                  # one tick now
 ```
 
@@ -68,7 +68,7 @@ Set the repository variable `SONAR_AGENT_MODE=live` plus a secret `SONAR_AGENT_K
 
 ```bash
 curl https://sonarpanta.xyz/api/health
-# {"ok":true,"store":"redis","panta":"ok:active","radarMarkets":64,...,"chain":{"paths":"RPC: Solami, stream: Solami",...}}
+# {"ok":true,"store":"redis","panta":"ok:active","radarMarkets":64,...,"chain":{"paths":"RPC: RPC Fast, stream: RPC Fast",...}}
 ```
 
 `chain` reports the live tape stream and which provider each chain path is on. The first health call after a boot is what starts the stream, and Render's own health check makes that call within seconds.

@@ -10,14 +10,14 @@
  * The socket lives in the one Next.js server process, started by the first /api/health call after boot. That
  * process can restart or sleep, so nothing depends on the socket staying up: the newest signature handled is
  * kept in the store, and after every (re)connect a bounded getSignaturesForAddress closes the gap. The scan's
- * own rebuild remains the backstop. The endpoint is Solami when SOLAMI_API_KEY is set (see solami.ts).
+ * own rebuild remains the backstop. The endpoint is RPC Fast or Solami when a key is set (see chain-endpoints.ts).
  */
 import bs58 from 'bs58';
 import WebSocket from 'ws';
 import { appendPrints, parseOrderLog, rpc as chainRpc, tradesFromTx, type ChainTapeCache, type Tx } from './chain-tape';
 import { PANTA_PROGRAM_MAINNET } from './panta-public';
 import { CHAIN_TAPE_KEY, KNOWN_IDS_KEY } from './radar';
-import { chainEndpoints, hostOf, isRefusal, markRefused, pickEndpoint, type ChainEndpoints } from './solami';
+import { PROVIDER_NAMES, chainEndpoints, hostOf, isProvider, isRefusal, markRefused, pickEndpoint, type ChainEndpoints } from './chain-endpoints';
 import { store } from './store';
 import type { ChainHealth, StreamHealth } from './types';
 
@@ -31,7 +31,7 @@ const DEAD_AFTER_MS = 75_000;
 const STABLE_AFTER_MS = 60_000;
 /** Fetches of a transaction the node just announced, before it is left for the scan. */
 const TX_TRIES = 3;
-/** Solami close codes that a reconnect will not fix: 4002 bandwidth and balance empty, 4029 connection cap reached. */
+/** Close codes that a reconnect will not fix (Solami: 4002 bandwidth and balance empty, 4029 connection cap reached). */
 const REFUSAL_CLOSE_CODES = [4002, 4029];
 
 interface Cursor { signature: string; slot: number }
@@ -157,7 +157,7 @@ export class TapeStream {
     if (this.stopped) return;
     const ep = pickEndpoint('ws', this.d.endpoints, this.d.now());
     const gen = ++this.gen; // frames from a socket that was replaced are ignored
-    this.h.provider = ep.provider; this.h.host = hostOf(ep.url); this.h.fallback = !!this.d.endpoints.fallback && ep.provider !== 'solami';
+    this.h.provider = ep.provider; this.h.host = hostOf(ep.url); this.h.fallback = !!this.d.endpoints.fallback && !isProvider(ep.provider);
     this.since = this.d.now();
     const on: SocketHandlers = {
       open: () => { if (gen === this.gen) this.sock?.send(subscribeFrame()); },
@@ -196,9 +196,9 @@ export class TapeStream {
     const now = this.d.now();
     const wasUp = this.subscribed;
     this.subscribed = false; this.sock = null;
-    if (provider === 'solami' && ((status !== null && isRefusal('ws', status)) || REFUSAL_CLOSE_CODES.includes(code))) {
+    if (isProvider(provider) && ((status !== null && isRefusal('ws', status)) || REFUSAL_CLOSE_CODES.includes(code))) {
       markRefused('ws', now);
-      this.h.note = `Solami refused the stream (${status !== null ? `HTTP ${status}` : `close ${code}`}); using the fallback endpoint`;
+      this.h.note = `${PROVIDER_NAMES[provider]} refused the stream (${status !== null ? `HTTP ${status}` : `close ${code}`}); using the fallback endpoint`;
     } else if (!wasUp && status !== null) this.h.note = `connect failed: HTTP ${status}`;
     if (this.stopped) return;
     if (wasUp && now - (this.h.connectedAt ?? now) >= STABLE_AFTER_MS) this.attempt = 0;
@@ -306,19 +306,17 @@ export function ensureTapeStream(): StreamHealth {
   return g[SLOT].health();
 }
 
-const NAMES = { solami: 'Solami', custom: 'custom RPC', public: 'public' } as const;
-
-/** Both paths in words, for example "RPC: Solami, stream: public fallback". */
+/** Both paths in words, for example "RPC: RPC Fast, stream: RPC Fast" or "RPC: Solami, stream: public fallback". */
 export function pathsLine(rpc: ChainHealth['rpc'], stream: StreamHealth): string {
-  const streamPath = !stream.enabled ? 'off' : `${NAMES[stream.provider]}${stream.fallback ? ' fallback' : ''}${stream.connected ? '' : ' (reconnecting)'}`;
-  return `RPC: ${NAMES[rpc.provider]}${rpc.fallback ? ' fallback' : ''}, stream: ${streamPath}`;
+  const streamPath = !stream.enabled ? 'off' : `${PROVIDER_NAMES[stream.provider]}${stream.fallback ? ' fallback' : ''}${stream.connected ? '' : ' (reconnecting)'}`;
+  return `RPC: ${PROVIDER_NAMES[rpc.provider]}${rpc.fallback ? ' fallback' : ''}, stream: ${streamPath}`;
 }
 
 /** Both chain paths as the health API and the market page report them. Starts the stream on first use. */
 export function chainHealth(): ChainHealth {
   const ep = chainEndpoints();
   const http = pickEndpoint('http', ep);
-  const rpc = { provider: http.provider, host: hostOf(http.url), fallback: !!ep.fallback && http.provider !== 'solami' };
+  const rpc = { provider: http.provider, host: hostOf(http.url), fallback: !!ep.fallback && !isProvider(http.provider) };
   const stream = ensureTapeStream();
   return { rpc, stream, paths: pathsLine(rpc, stream) };
 }

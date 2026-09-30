@@ -8,7 +8,7 @@
  * getSignaturesForAddress(market) + getTransaction(sig) with no IDL. GET /markets/{id}/trades/ is empty
  * for most resolved markets and for every graduated one (feedback item 17); this fills the gap.
  */
-import { isRefusal, markRefused, pickEndpoint, solamiWait } from './solami';
+import { isProvider, isRefusal, markRefused, paceWait, pickEndpoint } from './chain-endpoints';
 import type { Trade } from './types';
 
 const ORDER = /Primary Order(?: \((\w+)\))?: side=(Yes|No), (?:lamports|amount)=(\d+), yes_price=(\d+), no_price=(\d+), minted=(\d+)/;
@@ -20,16 +20,17 @@ export interface Tx { blockTime: number | null; meta: { err: unknown; logMessage
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** One JSON-RPC call on the chain endpoint: Solami when SOLAMI_API_KEY is set, the public endpoint otherwise (see solami.ts). */
+/** One JSON-RPC call on the chain endpoint: RPC Fast or Solami when a key is set, the public endpoint otherwise (see chain-endpoints.ts). */
 export async function rpc<T>(method: string, params: unknown[], tries = 5): Promise<T> {
   for (let i = 0; ; i++) {
     const ep = pickEndpoint('http');
-    if (ep.provider === 'solami') await sleep(solamiWait()); // stay inside the plan's request rate instead of bursting into it
+    const wait = paceWait(ep.provider); // stay inside the plan's request rate instead of bursting into it
+    if (wait) await sleep(wait);
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30_000);
     try {
       const res = await fetch(ep.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: ctl.signal, cache: 'no-store' });
-      // Solami refused the key (revoked, empty balance, wrong type): a retry changes nothing, so the fallback endpoint takes this call
-      if (ep.provider === 'solami' && isRefusal('http', res.status)) { markRefused('http'); i--; continue; }
+      // the provider refused the key (revoked, empty balance, wrong type): a retry changes nothing, so the fallback endpoint takes this call
+      if (isProvider(ep.provider) && isRefusal('http', res.status)) { markRefused('http'); i--; continue; }
       if (res.status === 429 || res.status >= 500) throw new Error(`rpc ${res.status}`);
       const j = (await res.json()) as { result?: T; error?: { message: string } };
       if (j.error) throw new Error(j.error.message);

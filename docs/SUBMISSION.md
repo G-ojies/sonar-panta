@@ -77,3 +77,28 @@ Listing and form: https://superteam.fun/earn/listing/panta-api-side-track (deadl
 4. Nigeria has 60M bettors and no venue where anyone can create a market on a Nigerian data release. The Create page ships starter boards: CBN, NBS inflation, naira, NGX, Super Eagles. Creators earn fees on every trade. (create screenshot)
 5. An agent paper-trades every call and settles against Panta's own resolutions. Track record in the open, plus a print-by-print replay over resolved Panta markets. (agent screenshot)
 6. Open source (MIT), 14 Panta endpoints, 17 API issues filed for the Panta team. Built for @ColosseumOrg's Crypto World's Fair, the @SuperteamNG track and the @PantaHQ side track. Live: (URL) · Code: github.com/G-ojies/sonar-panta
+
+## Superteam Earn — RPC Fast Infrastructure Sidetrack
+
+Listing and form: https://superteam.fun/earn/listing/colosseum-crypto-worlds-fair-hackathon-rpc-fast-infrastructure-sidetrack (deadline 13 October 2026 06:59 UTC; 21 winners, prize is RPC Fast credits worth about $499 each, not cash). Use greatojies@gmail.com.
+
+Before the Earn form, the listing's own conditions (all on the owner):
+
+1. Follow https://x.com/rpcfast from @Great_ojies.
+2. Join Telegram https://t.me/rpc_fast and Discord https://discord.com/invite/WYMDrbfUhq.
+3. Fill the RPC Fast application form for the free Focus plan (two months). Prefilled link, two fields left to type (the RPC Fast account email, and the Discord account name):
+   https://docs.google.com/forms/d/e/1FAIpQLSeZtDvOIwkT9IsVlXmbSLRfzOb6QjBY9AAL63dpWVGnUMONxw/viewform?usp=pp_url&entry.169818151=Sonar+for+Panta&entry.1052243141=https%3A%2F%2Fsonarpanta.xyz&entry.286099501=https%3A%2F%2Fx.com%2FGreat_ojies&entry.713214246=https%3A%2F%2Fcolosseum.com%2Farena%2Fprojects%2Fsonar-for-panta&entry.1807832504=Not+needed+for+now.+Sonar+holds+one+logsSubscribe+WebSocket+on+the+Panta+program+%28about+ten+transactions+a+day%29+plus+JSON-RPC+for+tape+rebuilds%3B+the+Focus+plan+covers+it.+If+we+add+a+second+high-volume+program+we+would+ask+for+Yellowstone+gRPC.&entry.90959516=Telegram+%40G_Ojies&entry.1869970843=%40Great_ojies&entry.1489054157=%40G_Ojies&entry.982375277=Yes
+4. Put the API key from the RPC Fast dashboard (solana.rpcfast.com, Products, Default project) into Render as `RPCFAST_API_KEY`, redeploy, and check `curl -s https://sonarpanta.xyz/api/health | jq .chain.paths` reads `RPC: RPC Fast, stream: RPC Fast`.
+5. Two to three public posts a month about RPC Fast in October and November (plan in docs/WEEKLY-UPDATES.md).
+
+Earn form answers:
+
+- **Project Name:** Sonar for Panta
+- **Project Description:** Sonar for Panta is the intelligence and execution layer for on-chain prediction markets on Solana. It scores every Panta market from its own trade tape, prices each question against Polymarket and Kalshi, lets users trade non-custodially from their own wallet, drafts new markets from a headline (starting with a weekly Nigeria board), and runs an autonomous agent that keeps a public track record with a walk-forward replay over resolved markets. Infrastructure use: Panta's API returns no trades for most resolved markets and for every graduated one, so Sonar rebuilds each market's tape from the program's own log on chain, and RPC Fast is the chain data path for that. One RPC Fast key carries both paths: JSON-RPC (getSignaturesForAddress + getTransaction) rebuilds tapes, paced to the plan's rate, and one logsSubscribe WebSocket on the Panta program streams live prints so a trade reaches Sonar seconds after it confirms instead of on the next 10-minute scan. Every plan including Start has WebSocket access, so both paths run on RPC Fast from the first key; a refused key moves that path to the public fallback for 30 minutes and the health API says which provider each path is on. The integration is documented in docs/RPCFAST.md with plan limits and the compute-unit budget (about 1 CU per call, a few thousand calls a day), covered by 71 tests, MIT licensed, and live at sonarpanta.xyz. Built by the team behind Sonar (sonar.nodalytics.xyz), a live signal engine on Kalshi/Polymarket with 672 resolved signals at a 57.7% 30-day win rate.
+- **Project Github Link:** https://github.com/G-ojies/sonar-panta
+- **Project Website:** https://sonarpanta.xyz
+- **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
+- **Link to your pitch deck or Loom/video presentation:** https://www.loom.com/share/64fdea3e83e147ee865af08b016792fa (deck: https://sonarpanta.xyz/pitch)
+- **Did you submit this project to the official Crypto World's Fair Hackathon on Colosseum? (Yes/No):** Yes (Crypto World's Fair, Solana track, country: Nigeria)
+- **Link to Colosseum project:** https://colosseum.com/arena/projects/sonar-for-panta
+- **Link to your project's Colosseum profile:** https://colosseum.com/arena/projects/sonar-for-panta (account GreYat_Labs)
