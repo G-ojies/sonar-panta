@@ -11,6 +11,7 @@
     "test": "tsx --test tests/*.test.ts",
     "agent": "tsx scripts/agent.ts",
     "snapshot": "tsx scripts/snapshot.ts",
+    "stream": "tsx scripts/tape-stream.ts",
     "postinstall": "node scripts/fix-types.js"
   },
   "dependencies": {
@@ -26,12 +27,14 @@
     "next": "14.2.15",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "ws": "^7.5.13",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
+    "@types/ws": "^7.4.7",
     "autoprefixer": "^10.4.20",
     "dotenv": "^16.6.1",
     "eslint": "^8",

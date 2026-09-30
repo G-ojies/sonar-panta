@@ -8,30 +8,35 @@
  * getSignaturesForAddress(market) + getTransaction(sig) with no IDL. GET /markets/{id}/trades/ is empty
  * for most resolved markets and for every graduated one (feedback item 17); this fills the gap.
  */
+import { isRefusal, markRefused, pickEndpoint, solamiWait } from './solami';
 import type { Trade } from './types';
 
-const RPC = () => process.env.SOLANA_RPC ?? process.env.NEXT_PUBLIC_SOLANA_RPC ?? 'https://api.mainnet-beta.solana.com';
 const ORDER = /Primary Order(?: \((\w+)\))?: side=(Yes|No), (?:lamports|amount)=(\d+), yes_price=(\d+), no_price=(\d+), minted=(\d+)/;
 
 export interface ChainTapeCache { ts: number; trades: Trade[]; signatures: number; complete: boolean }
 
 interface SigInfo { signature: string; blockTime: number | null; err: unknown }
-interface Tx { blockTime: number | null; meta: { err: unknown; logMessages?: string[] } | null; transaction: { message: { accountKeys: (string | { pubkey: string })[] } } }
+export interface Tx { blockTime: number | null; meta: { err: unknown; logMessages?: string[]; loadedAddresses?: { writable?: string[]; readonly?: string[] } } | null; transaction: { message: { accountKeys: (string | { pubkey: string })[] } } }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function rpc<T>(method: string, params: unknown[], tries = 5): Promise<T> {
+/** One JSON-RPC call on the chain endpoint: Solami when SOLAMI_API_KEY is set, the public endpoint otherwise (see solami.ts). */
+export async function rpc<T>(method: string, params: unknown[], tries = 5): Promise<T> {
   for (let i = 0; ; i++) {
+    const ep = pickEndpoint('http');
+    if (ep.provider === 'solami') await sleep(solamiWait()); // stay inside the plan's request rate instead of bursting into it
     const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30_000);
     try {
-      const res = await fetch(RPC(), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: ctl.signal, cache: 'no-store' });
+      const res = await fetch(ep.url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: ctl.signal, cache: 'no-store' });
+      // Solami refused the key (revoked, empty balance, wrong type): a retry changes nothing, so the fallback endpoint takes this call
+      if (ep.provider === 'solami' && isRefusal('http', res.status)) { markRefused('http'); i--; continue; }
       if (res.status === 429 || res.status >= 500) throw new Error(`rpc ${res.status}`);
       const j = (await res.json()) as { result?: T; error?: { message: string } };
       if (j.error) throw new Error(j.error.message);
       return j.result as T;
     } catch (e) {
       if (i >= tries - 1) throw e;
-      await sleep(1500 * 2 ** i + Math.random() * 500); // public RPC: back off on 429 and hiccups
+      await sleep(1500 * 2 ** i + Math.random() * 500); // back off on 429 and hiccups (a public RPC throttles shared hosts)
     } finally { clearTimeout(t); }
   }
 }
@@ -90,6 +95,20 @@ export async function fetchChainTape(marketId: string, opts: { maxSignatures?: n
   }));
   trades.sort((a, b) => (b.blockTime ?? 0) - (a.blockTime ?? 0));
   return { ts: Date.now() / 1000, trades, signatures: sigs.length, complete: sigs.length < max };
+}
+
+/**
+ * Add prints decoded by the live stream to a cached chain tape, once each, newest first. `ts` is the time of the
+ * last full rebuild and is left alone, so the radar's staleness rule still rebuilds the tape on schedule; a tape
+ * that starts from a streamed print has ts 0 and is rebuilt on the next scan.
+ */
+export function appendPrints(cache: ChainTapeCache | null, prints: Trade[]): ChainTapeCache {
+  const base = cache ?? { ts: 0, trades: [], signatures: 0, complete: false };
+  const seen = new Set(base.trades.map((t) => t.id));
+  const fresh = prints.filter((t) => !seen.has(t.id));
+  if (!fresh.length) return base;
+  const trades = [...base.trades, ...fresh].sort((a, b) => (b.blockTime ?? 0) - (a.blockTime ?? 0));
+  return { ...base, trades, signatures: base.signatures + new Set(fresh.map((t) => t.signature)).size };
 }
 
 /** Union of the API tape and the chain tape by signature, newest first. API rows win on a clash (they carry the API ids). */

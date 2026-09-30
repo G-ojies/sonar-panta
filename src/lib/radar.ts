@@ -3,7 +3,7 @@
  * refreshRadar() is the heavy path (≈2 API calls per market) and is meant to run
  * from a cron / the agent loop; readRadar() serves cached output to requests.
  */
-import { fetchChainTape, mergeTapes, tapeIsShort, type ChainTapeCache } from './chain-tape';
+import { appendPrints, fetchChainTape, mergeTapes, tapeIsShort, type ChainTapeCache } from './chain-tape';
 import { getMarket, getMarketTrades, isTradable, listOpenMarkets, marketYesPrice } from './panta';
 import { computeSignals } from './signals';
 import { store } from './store';
@@ -26,9 +26,11 @@ const K = {
 const STRIKES_LIMIT = 6;
 /** Seconds before an open market is priced against the other venues again. */
 const VENUE_RECHECK_S = 3 * 3600;
-/** Markets whose tape is rebuilt from chain in one scan. Each costs one signature list plus one getTransaction per print on a public RPC. */
+/** Markets whose tape is rebuilt from chain in one scan. Each costs one signature list plus one getTransaction per print. */
 const CHAIN_TAPES_PER_SCAN = Number(process.env.CHAIN_TAPES_PER_SCAN ?? 3);
 export const CHAIN_TAPE_KEY = K.chain;
+/** Every market id a scan has seen and still tracks. The live stream maps a print to its market with it. */
+export const KNOWN_IDS_KEY = K.known;
 /** Ids of every resolved market a scan has passed. The catalog rotates, so the backtest replays from this. */
 export const RESOLVED_IDS_KEY = K.resolved;
 
@@ -168,8 +170,15 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
         const stale = !chain || (!frozen && now - chain.ts > 3600) || (!chain.complete && now - chain.ts > 86400);
         if (stale && chainBudget > 0) {
           chainBudget--;
-          try { chain = await fetchChainTape(id, { concurrency: Number(process.env.CHAIN_TAPE_CONCURRENCY ?? 1) }); await s.set(K.chain(id), chain, frozen ? 90 * 86400 : 7 * 86400); }
-          // a public RPC throttles shared hosts; the tape is retried next scan and the API tape stands meanwhile
+          try {
+            const began = Date.now() / 1000;
+            chain = await fetchChainTape(id, { concurrency: Number(process.env.CHAIN_TAPE_CONCURRENCY ?? 1) });
+            // an open market can print while its tape is being rebuilt: keep what the live stream stored in that window
+            // (and only that, so the rebuild stays the source of truth for everything older)
+            if (!frozen) chain = appendPrints(chain, ((await s.get<ChainTapeCache>(K.chain(id)))?.trades ?? []).filter((t) => (t.blockTime ?? 0) > began - 120));
+            await s.set(K.chain(id), chain, frozen ? 90 * 86400 : 7 * 86400);
+          }
+          // the endpoint throttled or failed; the tape is retried next scan and the API tape stands meanwhile
           catch (e) { skipped.push(`chain tape ${id}: ${(e as Error).message}, retried next scan`); }
         }
         if (chain) tape = mergeTapes(tape, chain.trades);

@@ -228,3 +228,41 @@ export interface Snapshot {
   volumeUsdc: number;
   trades: number;
 }
+
+/** State of the live tape stream, as /api/health and the market page show it. Times are unix seconds. */
+export interface StreamHealth {
+  enabled: boolean;
+  /** Subscribed and receiving: the socket is open and the node confirmed the log subscription. */
+  connected: boolean;
+  /** Who carries the stream: Solami, a custom RPC, or the public mainnet endpoint. */
+  provider: 'solami' | 'custom' | 'public';
+  host: string;
+  /** Solami is configured but refused the stream, so the fallback endpoint carries it. */
+  fallback: boolean;
+  startedAt: number | null;
+  connectedAt: number | null;
+  /** Last frame or pong from the node: proof the socket is alive on a quiet program. */
+  lastAliveAt: number | null;
+  /** Last program transaction the node pushed. */
+  lastEventAt: number | null;
+  /** Slot of the newest program transaction seen, live or while closing a gap. */
+  lastSlot: number | null;
+  lastPrintAt: number | null;
+  /** Program transactions pushed since start, and the prints decoded from them. */
+  events: number;
+  prints: number;
+  /** Prints recovered by the catch-up after a reconnect or restart. */
+  recovered: number;
+  /** Orders whose market could not be identified; the next scan picks them up. */
+  unmapped: number;
+  reconnects: number;
+  note: string | null;
+}
+
+/** Which provider each chain path is on right now: the RPC that rebuilds tapes, and the live stream. */
+export interface ChainHealth {
+  rpc: { provider: StreamHealth['provider']; host: string; /** Solami is configured but refused the key, so the fallback answers. */ fallback: boolean };
+  stream: StreamHealth;
+  /** The same in words, for example "RPC: Solami, stream: public fallback". */
+  paths: string;
+}
