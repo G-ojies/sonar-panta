@@ -14,7 +14,7 @@
  */
 import bs58 from 'bs58';
 import WebSocket from 'ws';
-import { appendPrints, historyHealth, parseOrderLog, rpc as chainRpc, tradesFromTx, type ChainTapeCache, type Tx } from './chain-tape';
+import { appendPrints, historyEndpoint, historyHealth, parseOrderLog, rpc as chainRpc, tradesFromTx, type ChainTapeCache, type Tx } from './chain-tape';
 import { PANTA_PROGRAM_MAINNET } from './panta-public';
 import { CHAIN_TAPE_KEY, KNOWN_IDS_KEY } from './radar';
 import { PROVIDER_NAMES, chainEndpoints, hostOf, isProvider, isRefusal, markRefused, pickEndpoint, type ChainEndpoints } from './chain-endpoints';
@@ -288,12 +288,13 @@ export function streamEnabled(env: Record<string, string | undefined> = process.
 
 // One stream per process, kept on globalThis so every route bundle (and a dev hot reload) shares it.
 const SLOT = Symbol.for('sonar.tape-stream');
-type Holder = { [SLOT]?: TapeStream };
+const PROBED = Symbol.for('sonar.history-probed');
+type Holder = { [SLOT]?: TapeStream; [PROBED]?: boolean };
+const g = globalThis as Holder;
 
 /** Start the stream if this process has not yet, and report its state. Cheap to call on every request. */
 export function ensureTapeStream(): StreamHealth {
   if (!streamEnabled()) return OFF;
-  const g = globalThis as Holder;
   if (!g[SLOT]) {
     const s = new TapeStream({
       endpoints: chainEndpoints(), open: openSocket, rpc: chainRpc, store: store(), now: () => Date.now(),
@@ -320,6 +321,8 @@ export function chainHealth(): ChainHealth {
   const http = pickEndpoint('http', ep);
   const rpc = { provider: http.provider, host: hostOf(http.url), fallback: !!ep.fallback && !isProvider(http.provider) };
   const stream = ensureTapeStream();
+  // the first health call after boot also runs the history probe, so the line settles before the first rebuild
+  if (!g[PROBED]) { g[PROBED] = true; void historyEndpoint().catch(() => {}); }
   const history = historyHealth();
   return { rpc, stream, history, paths: pathsLine(rpc, stream, history) };
 }
