@@ -40,11 +40,24 @@ RPC Fast bills in compute units: one CU per RPC call (`getProgramAccounts` is te
 
 Sonar's RPC use is small and bounded. A scan runs every ten minutes and rebuilds at most `CHAIN_TAPES_PER_SCAN` (default 3) stale tapes; a rebuild is one signature list plus one `getTransaction` per print, and a Panta market has tens of prints, rarely hundreds. Resolved markets are rebuilt once and then kept for 90 days. The stream adds one `getTransaction` per live order and one signature list per reconnect. Taken together that is on the order of a few hundred to a few thousand calls a day, well under the Start plan's 1.5M CU a month; the dashboard's Billing and usage page shows the real number, and `npx tsx scripts/measure-traffic.ts` counts one scan's requests by host.
 
+## Ledger history: the one thing to know
+
+RPC Fast's shared nodes keep about a day of ledger. Measured on 1 October 2026 at 18:30 UTC: `getFirstAvailableBlock` returned slot 452,165,950, and `getSignaturesForAddress` on the Panta program returned 8 signatures, the oldest from 05:39 UTC that morning, where the public endpoint returned a full page of 1,000 reaching back to 15 August. A node without that history answers with the signatures it has and no error, so a tape rebuild for a market older than a day would quietly come back empty.
+
+Sonar handles it in `src/lib/chain-tape.ts`:
+
+- **Probe.** Once an hour the provider is asked for the program's signatures (one call). A full page, or an oldest signature more than a week old, means the node keeps history. RPC Fast does not pass; the public endpoint and Solami do (Solami's `getFirstAvailableBlock` is recent too, but its signature history reaches back, so the probe asks for signatures rather than that slot).
+- **Routing.** Reads that go months back, the signature list and the transactions of a tape rebuild, go to the history endpoint when the provider lacks history: Solami if `SOLAMI_API_KEY` is also set, else the public endpoint. The live path stays on RPC Fast: the stream, the one `getTransaction` behind each live print, and the catch-up after a reconnect, all of which sit inside the last day.
+- **Safety net.** Every rebuild compares the signatures found with the trade count the chain reports for the market. A provider that comes up short is marked as lacking history for an hour and the rebuild is redone on the history endpoint, whatever the probe said.
+- **Health.** `/api/health` reports `chain.history` (provider, host, whether the probe has run, a note), and `chain.paths` names it when it differs: `RPC: RPC Fast, stream: RPC Fast, history: Solami`.
+
+One consequence: after a restart longer than a day, the stream's catch-up cannot see the gap and the scan's rebuild (on the history endpoint) is what closes it, which is what it is there for.
+
 The two paths degrade on their own, and the health output always says which provider each one is on:
 
 | Key | Tape rebuild (RPC) | Live stream (WebSocket) | `chain.paths` in `/api/health` |
 | --- | --- | --- | --- |
-| RPC Fast, any plan | RPC Fast | RPC Fast | `RPC: RPC Fast, stream: RPC Fast` |
+| RPC Fast, any plan | RPC Fast for recent reads; history over Solami or the public endpoint | RPC Fast | `RPC: RPC Fast, stream: RPC Fast, history: Solami` (or `history: public`) |
 | RPC Fast key revoked or out of CU | public endpoint | public endpoint | `RPC: public fallback, stream: public fallback` |
 | No key | public endpoint | public endpoint | `RPC: public, stream: public` |
 
@@ -59,7 +72,7 @@ All of these are read on the server only.
 | `RPCFAST_API_KEY` | for RPC Fast | The project's API key from the dashboard. Sets both URLs: `https://solana-rpc.rpcfast.com/?api_key=…` and `wss://solana-rpc.rpcfast.com/?api_key=…`. |
 | `RPCFAST_RPC_URL`, `RPCFAST_WS_URL` | no | Replace the base URLs. A URL copied whole from the dashboard, key included, is used as given, and the key found in one serves the other. |
 | `RPCFAST_RPS` | no | RPC calls a second sent to RPC Fast. Default 10. Raise it on Focus (50 allowed). |
-| `CHAIN_PROVIDER` | no | `rpcfast` or `solami`, when both keys are set. Default: RPC Fast. |
+| `CHAIN_PROVIDER` | no | `rpcfast` or `solami`, when both keys are set. Default: RPC Fast, with Solami as the history endpoint. |
 | `CHAIN_TAPES_PER_SCAN` | no | Stale tapes rebuilt per scan. Default 3; the Focus plan can take more. |
 | `SONAR_TAPE_STREAM` | no | `off` disables the stream, `on` forces it. Default: on, except on Vercel and during the build. |
 | `SOLANA_RPC`, `NEXT_PUBLIC_SOLANA_RPC`, `SOLANA_WS` | no | The fallback endpoints. Default: public mainnet. |
@@ -79,7 +92,7 @@ Create a free account at rpcfast.com (Log In, then the Solana dashboard). The fi
 
 **From a terminal.** `npm run stream` connects the same way the server does and prints what arrives. `--replay N` first pushes the program's last N transactions through the same decode and mapping code, which is useful because the program can go hours without a trade. With `RPCFAST_API_KEY` set the first line reads `rpc rpcfast (solana-rpc.rpcfast.com), stream rpcfast (solana-rpc.rpcfast.com)`.
 
-**From the health API.** `curl -s https://sonarpanta.xyz/api/health | jq .chain` reports `provider: "rpcfast"` and `host: "solana-rpc.rpcfast.com"` on each path, plus the last slot seen, prints streamed, and reconnects. The fields are described in [SOLAMI.md](SOLAMI.md#see-it-working).
+**From the health API.** `curl -s https://sonarpanta.xyz/api/health | jq .chain` reports `provider: "rpcfast"` and `host: "solana-rpc.rpcfast.com"` on the RPC and stream paths, the history path beside them, plus the last slot seen, prints streamed, and reconnects. The fields are described in [SOLAMI.md](SOLAMI.md#see-it-working).
 
 **In the app.** Under the "Trade tape" heading on any market page: `Program log streaming live over RPC Fast · last Panta transaction at slot …`.
 

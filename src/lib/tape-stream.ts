@@ -14,7 +14,7 @@
  */
 import bs58 from 'bs58';
 import WebSocket from 'ws';
-import { appendPrints, parseOrderLog, rpc as chainRpc, tradesFromTx, type ChainTapeCache, type Tx } from './chain-tape';
+import { appendPrints, historyHealth, parseOrderLog, rpc as chainRpc, tradesFromTx, type ChainTapeCache, type Tx } from './chain-tape';
 import { PANTA_PROGRAM_MAINNET } from './panta-public';
 import { CHAIN_TAPE_KEY, KNOWN_IDS_KEY } from './radar';
 import { PROVIDER_NAMES, chainEndpoints, hostOf, isProvider, isRefusal, markRefused, pickEndpoint, type ChainEndpoints } from './chain-endpoints';
@@ -307,9 +307,11 @@ export function ensureTapeStream(): StreamHealth {
 }
 
 /** Both paths in words, for example "RPC: RPC Fast, stream: RPC Fast" or "RPC: Solami, stream: public fallback". */
-export function pathsLine(rpc: ChainHealth['rpc'], stream: StreamHealth): string {
+export function pathsLine(rpc: ChainHealth['rpc'], stream: StreamHealth, history?: ChainHealth['history']): string {
   const streamPath = !stream.enabled ? 'off' : `${PROVIDER_NAMES[stream.provider]}${stream.fallback ? ' fallback' : ''}${stream.connected ? '' : ' (reconnecting)'}`;
-  return `RPC: ${PROVIDER_NAMES[rpc.provider]}${rpc.fallback ? ' fallback' : ''}, stream: ${streamPath}`;
+  // the history path is named only when it differs from the RPC path
+  const historyPath = history && (history.provider !== rpc.provider || history.host !== rpc.host) ? `, history: ${PROVIDER_NAMES[history.provider]}` : '';
+  return `RPC: ${PROVIDER_NAMES[rpc.provider]}${rpc.fallback ? ' fallback' : ''}, stream: ${streamPath}${historyPath}`;
 }
 
 /** Both chain paths as the health API and the market page report them. Starts the stream on first use. */
@@ -318,5 +320,6 @@ export function chainHealth(): ChainHealth {
   const http = pickEndpoint('http', ep);
   const rpc = { provider: http.provider, host: hostOf(http.url), fallback: !!ep.fallback && !isProvider(http.provider) };
   const stream = ensureTapeStream();
-  return { rpc, stream, paths: pathsLine(rpc, stream) };
+  const history = historyHealth();
+  return { rpc, stream, history, paths: pathsLine(rpc, stream, history) };
 }

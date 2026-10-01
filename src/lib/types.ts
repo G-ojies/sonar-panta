@@ -263,6 +263,8 @@ export interface StreamHealth {
 export interface ChainHealth {
   rpc: { provider: StreamHealth['provider']; host: string; /** A provider is configured but refused the key, so the fallback answers. */ fallback: boolean };
   stream: StreamHealth;
-  /** The same in words, for example "RPC: RPC Fast, stream: RPC Fast". */
+  /** Who answers reads that go months back (tape rebuilds). `probed` is null with no provider, false until the first probe. */
+  history: { provider: StreamHealth['provider']; host: string; probed: boolean | null; note: string | null };
+  /** The same in words, for example "RPC: RPC Fast, stream: RPC Fast, history: Solami". */
   paths: string;
 }

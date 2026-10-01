@@ -57,7 +57,7 @@ Sonar reads Solana through [RPC Fast](https://rpcfast.com) when `RPCFAST_API_KEY
 - **RPC** rebuilds each market's tape from the Panta program's log (`getSignaturesForAddress` + `getTransaction`), paced to the plan's request rate.
 - **WebSocket** carries the live tape stream: one `logsSubscribe` filtered to the Panta program. A trade is decoded and added to its market's tape seconds after it confirms, instead of on the next scan. The socket reconnects with backoff and closes the gap after a reconnect or restart.
 
-RPC Fast serves both from one host (`solana-rpc.rpcfast.com`, Frankfurt), and every plan including the free Start plan has WebSocket access, so both paths run there:
+RPC Fast serves both from one host (`solana-rpc.rpcfast.com`, Frankfurt), and every plan including the free Start plan has WebSocket access, so both paths run there. Its nodes keep about a day of ledger, so the reads that go months back (a market's whole tape) are routed to an archive endpoint, Solami or the public one, after a probe; the health line names that path too.
 - **Health is surfaced.** `/api/health` reports the provider on each path, the last slot seen, prints streamed and reconnects; every market page shows one status line under the tape.
 
 ```bash
@@ -108,7 +108,7 @@ The **replay** walks every resolved market print by print, asks Sonar for its re
 npm test
 ```
 
-71 tests, no network and no API key needed. They cover the parts the record depends on: the signal engine (a YES tape and a NO tape mirror each other, a closed market never produces a call), the replay (prints added after the opening print cannot change the call, so there is no look-ahead), the decoder that reads orders from the Solana program log, the live tape stream (endpoint selection for RPC Fast, Solami and no key, a pushed log line becoming a stored print, refusal and fallback, reconnect backoff and the catch-up after a gap), the cross-venue matcher (including the false match that was fixed), and the Nigeria board specs. CI runs typecheck, lint and tests on every push.
+76 tests, no network and no API key needed. They cover the parts the record depends on: the signal engine (a YES tape and a NO tape mirror each other, a closed market never produces a call), the replay (prints added after the opening print cannot change the call, so there is no look-ahead), the decoder that reads orders from the Solana program log, the live tape stream (endpoint selection for RPC Fast, Solami and no key, a pushed log line becoming a stored print, refusal and fallback, the ledger-history probe and routing, reconnect backoff and the catch-up after a gap), the cross-venue matcher (including the false match that was fixed), and the Nigeria board specs. CI runs typecheck, lint and tests on every push.
 
 ## Documents
 

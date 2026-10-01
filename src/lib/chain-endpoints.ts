@@ -13,6 +13,13 @@
  * SOLANA_RPC / NEXT_PUBLIC_SOLANA_RPC or the public mainnet endpoint, as before, and that endpoint is also the
  * fallback when the provider refuses a call.
  *
+ * Ledger history is the one thing the providers differ on. RPC Fast's shared nodes keep about a day of ledger
+ * (measured 1 Oct 2026: first available block 452,165,950, oldest program signature 13 hours old), while the public
+ * endpoint and Solami answer getSignaturesForAddress for months back. A tape rebuild needs that depth, so
+ * chain-tape.ts probes the provider once an hour and sends history reads to `history` when it comes up short:
+ * the other configured provider if there is one, else the plain endpoint. The live path (the stream, the one
+ * getTransaction behind each print, the catch-up after a reconnect) stays on the provider.
+ *
  * URL formats and auth, from each provider's docs and dashboard (read 30 Sep 2026):
  *   RPC Fast   https://solana-rpc.rpcfast.com/?api_key=KEY     wss://solana-rpc.rpcfast.com/?api_key=KEY
  *   Solami     https://rpc.solami.dev/sol?api_key=KEY           wss://ws.solami.dev/ws/sol?api_key=KEY
@@ -22,7 +29,14 @@
  */
 export type ProviderName = 'rpcfast' | 'solami' | 'custom' | 'public';
 export interface Endpoint { provider: ProviderName; url: string }
-export interface ChainEndpoints { http: Endpoint; ws: Endpoint; /** Used when the provider refuses the key; null when no provider is configured. */ fallback: { http: Endpoint; ws: Endpoint } | null }
+export interface ChainEndpoints {
+  http: Endpoint;
+  ws: Endpoint;
+  /** Where reads that go months back (a market's whole tape) go when the provider keeps only recent ledger: the other configured provider, else the plain endpoint. */
+  history: Endpoint;
+  /** Used when the provider refuses the key; null when no provider is configured. */
+  fallback: { http: Endpoint; ws: Endpoint } | null;
+}
 type Env = Record<string, string | undefined>;
 type Kind = 'http' | 'ws';
 type Pair = { http: Endpoint; ws: Endpoint };
@@ -77,8 +91,9 @@ export function chainEndpoints(env: Env = process.env): ChainEndpoints {
   const want = clean(env.CHAIN_PROVIDER)?.toLowerCase();
   // the named provider when it is configured; otherwise RPC Fast first, then Solami
   const chosen = (want === 'solami' && solami) || (want === 'rpcfast' && rpcfast) || rpcfast || solami;
-  if (!chosen) return { ...plain, fallback: null };
-  return { ...chosen, fallback: plain };
+  if (!chosen) return { ...plain, history: plain.http, fallback: null };
+  const other = chosen === rpcfast ? solami : rpcfast;
+  return { ...chosen, history: other?.http ?? plain.http, fallback: plain };
 }
 
 /** Host only, for health output and logs: the key lives in the query string and must never be printed. */

@@ -172,7 +172,7 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
           chainBudget--;
           try {
             const began = Date.now() / 1000;
-            chain = await fetchChainTape(id, { concurrency: Number(process.env.CHAIN_TAPE_CONCURRENCY ?? 1) });
+            chain = await fetchChainTape(id, { concurrency: Number(process.env.CHAIN_TAPE_CONCURRENCY ?? 1), expected: Number(d.onChain?.totalTrades ?? 0) });
             // an open market can print while its tape is being rebuilt: keep what the live stream stored in that window
             // (and only that, so the rebuild stays the source of truth for everything older)
             if (!frozen) chain = appendPrints(chain, ((await s.get<ChainTapeCache>(K.chain(id)))?.trades ?? []).filter((t) => (t.blockTime ?? 0) > began - 120));
