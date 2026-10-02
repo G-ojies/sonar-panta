@@ -1,0 +1,19 @@
+[toolchain]
+anchor_version = "1.0.1"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+curve_market = "DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp"
+
+[programs.devnet]
+curve_market = "DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp"
+
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test --release"
