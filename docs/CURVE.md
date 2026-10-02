@@ -1,6 +1,6 @@
 # Sonar Curve: the Meteora DBC data path
 
-Sonar Curve follows token launches on Meteora's Dynamic Bonding Curve (DBC): the price along each curve, the quote it has raised, how far it is from graduation, and the prints behind that, decoded from the program's own events and accounts. It is served on `/curve` and as JSON for terminals. The on-chain graduation markets (a parimutuel YES/NO on whether a curve graduates before a date, resolved from the pool account itself) are the `curve_market` program on the `curve-program` branch; the pool page keeps a panel for them. The plan is in [CURVE-PLAN.md](CURVE-PLAN.md).
+Sonar Curve follows token launches on Meteora's Dynamic Bonding Curve (DBC): the price along each curve, the quote it has raised, how far it is from graduation, and the prints behind that, decoded from the program's own events and accounts. It is served on `/curve` and as JSON for terminals. The on-chain graduation markets (a parimutuel YES/NO on whether a curve graduates before a date, resolved from the pool account itself) are the `curve_market` program, documented in [CURVE-PROGRAM.md](CURVE-PROGRAM.md) and wired into the pool page; see [Graduation markets](#graduation-markets) below. The plan is in [CURVE-PLAN.md](CURVE-PLAN.md).
 
 Nothing here needs an SDK or an indexer. The program's IDL (`src/lib/dbc-idl.json`, program version 0.2.1) is the only source of truth for discriminators and layouts, and the chain is the only source of data, read through the same RPC path as the Panta tape (Solami or RPC Fast when a key is set, the public endpoint otherwise; see [SOLAMI.md](SOLAMI.md)).
 
@@ -132,16 +132,86 @@ Never cached. 400 for a string that is not a public key, 404 for an account that
     "sqrtPriceAfter": "354337999572150541", "quoteReserveAfter": "10745917181", "migrationThreshold": "11510000000", "source": "chain"
   }],
   "tapeUpdatedAt": 1790933644, "tapeComplete": false, "fresh": true,
-  "market": null
+  "markets": { "...the same body /api/curve/markets?pool=<address> returns, or null when that read failed..." }
 }
 ```
 
-`tape` is newest first, up to 200 prints. Price after a print is `(sqrtPriceAfter / 2^64)^2 * 10^(baseDecimals - quote.decimals)`; progress after it is `quoteReserveAfter / migrationThreshold`. `tapeComplete` is true when the pool's whole history fit the bounds. `market` is reserved for the graduation market once the program is wired.
+`tape` is newest first, up to 200 prints. Price after a print is `(sqrtPriceAfter / 2^64)^2 * 10^(baseDecimals - quote.decimals)`; progress after it is `quoteReserveAfter / migrationThreshold`. `tapeComplete` is true when the pool's whole history fit the bounds. `markets` carries the pool's graduation markets (below).
+
+### `GET /api/curve/markets`
+
+Query: `pool=<address>` for one pool's markets (all of them otherwise), `user=<wallet>` to add that wallet's positions, `fresh=1` to skip the 20 s cache (the page sends it right after a transaction). Never cached at the edge.
+
+```json
+{
+  "cluster": "devnet", "program": "DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp", "live": true, "updatedAt": 1790936488,
+  "markets": [{
+    "address": "6UP1xah7U3gLNbhaWgHrwap7qr1S6r74xGSCCu8f3xs3", "pool": "HC7QTaRzfQuRDV8irdojM23WDQPaSmruSEnRmjkuqPuf",
+    "config": "FAGvfZpCHPmNBSqzUP9EKtQqTsAA3VHRLLuqZuhv1Cu4", "quoteMint": "So11111111111111111111111111111111111111112",
+    "tokenProgram": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", "vault": "4dYrFaGcwDhviAscTMuUmkeMr2Kp8zzEnmBdbipugtv8",
+    "creator": "FHj8w7MuuqMBeEKdFT2BXEEx9Xj6dZ18Z9cLiBmPr513", "deadlineTs": 1790936833, "thresholdRaw": "10000000000",
+    "yesTotalRaw": "3000000", "noTotalRaw": "2000000", "paidOutRaw": "0", "state": "open", "resolvedAt": null, "bump": 255, "vaultBump": 254
+  }],
+  "positions": [{ "address": "EcY7...AUbn", "market": "6UP1...3xs3", "owner": "FHj8...r513", "yesAmountRaw": "3000000", "noAmountRaw": "0", "claimed": false, "bump": 255 }]
+}
+```
+
+`state` is `open`, `yes`, `no` or `refund`. Raw amounts are strings of the quote token's base units. `live` says whether the app's own cluster is the one the markets run on; when it is false the page shows them read-only. Open markets come first by deadline, then settled ones newest first.
 
 ## Pages
 
 - `/curve`: the index as a list, with a status filter, a progress bar per pool, quote raised against the threshold, price, prints seen, the largest print and age. A table on wide screens, cards on phones. A lookup box opens any pool address.
-- `/curve/<address>`: price, the graduation progress with what is left to raise, the price path drawn from the tape, the account fields behind graduation, the tape, the largest prints, and the reserved graduation market panel. Polls its API every 30 seconds.
+- `/curve/<address>`: price, the graduation progress with what is left to raise, the price path drawn from the tape, the account fields behind graduation, the tape, the largest prints, and the graduation market panel. Polls its API every 30 seconds, the markets every 15. A row on `/curve` carries a "1 market" chip when the pool has open markets and "settled" when it only has resolved ones.
+
+## Graduation markets
+
+The `curve_market` program ([CURVE-PROGRAM.md](CURVE-PROGRAM.md)) holds parimutuel YES/NO markets on one question per pool and deadline: does the curve finish at or before the deadline? The web side is `src/lib/curve-market.ts` (PDAs, account decoders, the four instructions and the token instructions around them, read helpers), `src/lib/curve-market-math.ts` (odds, payouts and the program's decision function, mirrored so the page needs neither the IDL nor web3.js), `src/lib/curve-market-server.ts` (the cached reads behind the API) and `src/components/CurveMarketPanel.tsx`. No Anchor client and no SPL token library: the discriminators come from `onchain/idl/curve_market.json` and the tests check them against it.
+
+### Where the markets run
+
+The program is deployed on devnet only; a mainnet deployment is a decision for the owner (about 1.35 SOL of rent, see the program doc). So the markets are always read from devnet, whatever cluster the app is on: `CURVE_MARKET_RPC` when set, else the app's own RPC when the app is on devnet, else the public devnet endpoint. The panel shows a `devnet` pill and enables the actions only when the app's cluster is the markets' cluster (`NEXT_PUBLIC_SOLANA_CLUSTER=devnet`); on mainnet the markets are shown read-only with a note. Pool addresses differ between clusters, so a mainnet pool page lists no markets until the program is on mainnet. The map of program ids per cluster is `CURVE_MARKET_PROGRAMS` in `curve-market.ts`.
+
+### The flow on the pool page
+
+1. **Open a market.** Pick a deadline (1 h, 6 h, 24 h, 7 d, or a date and time, at least a minute and at most 180 days away) and sign `create_market`. The creator pays about 0.0034 SOL of rent for the `Market` account and its vault and gets no fee. The program refuses a pool whose curve is already complete.
+2. **Stake.** Pick YES or NO and an amount of the pool's quote token (at least 0.001 SOL or 1 USDC). The buttons show the multiple a win would pay at today's totals. With wrapped SOL the transaction creates the wallet's wSOL token account if it is missing, moves the lamports in, syncs the balance, stakes, and closes the account again when it was created here, so no SOL stays wrapped. With any other quote token the wallet's token account must already hold the amount. A stake is refused once the deadline has passed.
+3. **Resolve.** The panel runs the program's decision function on the pool row it already has (`finish_curve_timestamp` first, then `is_migrated`, then `quote_reserve` against the threshold before the deadline, then the deadline itself) and shows a resolve box as soon as it returns a side. Anyone may sign it. One side empty resolves to a refund.
+4. **Claim.** Once the market is settled, a wallet with a position sees what it can claim (its stake plus its share of the losing side, its stake back on a refund, or only the position rent on a loss) and signs `claim`. The payout lands in the wallet's token account and wrapped SOL is unwrapped by closing it.
+
+Errors use the IDL's messages (`friendlyProgramError`), a wallet rejection is not an error, and every signature links to Solscan on the right cluster.
+
+### Running it on devnet
+
+```
+NEXT_PUBLIC_SOLANA_CLUSTER=devnet NEXT_PUBLIC_SOLANA_RPC=https://api.devnet.solana.com \
+SOLANA_RPC=https://api.devnet.solana.com RPCFAST_API_KEY= SOLAMI_API_KEY= \
+KV_REST_API_URL= KV_REST_API_TOKEN= SONAR_STORE_FILE=/tmp/sonar-devnet.json npm run dev
+```
+
+The empty keys keep the DBC index off the mainnet providers and the scratch store keeps devnet pools out of the production Redis. Run `npx tsx scripts/measure-curve.ts` with the same variables to index devnet pools once; the pools with markets are pinned, so every refresh follows them. Most DBC traffic on devnet is the newer `TransferHookPool` account type (discriminator `[237,219,184,23,42,189,169,35]`, also 424 bytes), which neither the index nor the program accepts; `VirtualPool` launches are rarer there.
+
+`scripts/curve-market-devnet.ts` drives the program from a keypair file with the same builders the panel uses (`markets`, `create`, `stake`, `resolve`, `claim`, `fund`), which is how the run below was made.
+
+### Verified on devnet
+
+2 October 2026, program `DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp`, pool `HC7QTaRzfQuRDV8irdojM23WDQPaSmruSEnRmjkuqPuf` (a SOL curve with a 10 SOL threshold, 0 percent filled), wallet A `FHj8w7MuuqMBeEKdFT2BXEEx9Xj6dZ18Z9cLiBmPr513`, wallet B `DTeo8aoBMJWnGfCn14qAbMVKJhJcN94yLmcdGsadqood` (a throwaway funded from A). Every transaction went through the public devnet endpoint and confirmed on the first send. Links are `https://solscan.io/tx/<signature>?cluster=devnet`.
+
+| Step | Wallet | Signature | Result |
+| --- | --- | --- | --- |
+| `create_market`, deadline 7 minutes ahead (10:27:13 UTC) | A | `3eBY1purFynymn7vNcsRQNCuvSGeA4tdi1RzY8pQiecNDURS57LK5KgLcsqdkiDGwAnrEpPtCd1kk1Rqapma9WXU` | market `6UP1xah7U3gLNbhaWgHrwap7qr1S6r74xGSCCu8f3xs3`, vault `4dYrFaGcwDhviAscTMuUmkeMr2Kp8zzEnmBdbipugtv8`; 0.0034 SOL of rent |
+| fund wallet B with 0.012 SOL | A | `53sPS93DXxCGFmjMYxkMPx5MdQsW4CcAFiNBtRTaQojUPjBeQ5iGZRcP7rhDVDNVVJTCxzn1TDiPYwg97YPa4ooT` | |
+| `stake` YES 0.003 SOL (create wSOL ATA, transfer, SyncNative, stake, close ATA in one transaction) | A | `3Kn4vR9aJXzfxgKVzBNtsvFZume1GioSxqM1Q2vgNpV7bZY6C2akPhiJ6CW91tnZRM9cQbJvL7917ofoCyzjQBwJ` | `yes_total` 0.003 |
+| `stake` NO 0.002 SOL, same path | B | `3hMKCLx643FpWEZ7vxBSEt8WGFZjGEW7iaFwW4q2wnWVCZiDMGae41C7DBbkj5KkApTzAKSSycbVmYdMHrsquYmF` | `no_total` 0.002 |
+| `resolve` before the deadline | A | (simulation refused, nothing sent) | `NotYet` (0x177f), shown as "The pool has not graduated and the deadline has not passed yet" |
+| `resolve` after the deadline | A | `5opgjhs82euupaawEyhoYX5XMgFfJ7UGWrJoJTxFzSq6TQWUoJi1gF9hN512Cvq1UCEKZDF2PXUL9CuCnJUgD9zL` | `ResolvedNo`, `resolved_at` 1790936933 |
+| `claim` on the winning NO position (claim, then close the wSOL ATA to unwrap) | B | `4WGy2ytDDk6C2MQisjVv2UeGNXXczEkSw2iuM7Nu2FKMw49WHABNpH1PihyBmMREWzkf53Xgb2UtdGxcfX1DCEdJ` | paid 0.005 SOL (its 0.002 plus the 0.003 YES side); B went from 0.008888 to 0.014990 SOL with the position rent back |
+| `claim` on the losing YES position | A | `63HV4GsLhf2LSEFbxioW779u6iw5KMkWqyi6HcbaFQQwUzJnqfbTEKybn9SFQBju2oDpirrgCGN7ujhzhCfaQD1q` | payout 0, position closed, 0.0011 SOL of rent back; `paid_out` equals the pool, 0.005 SOL |
+| `create_market`, deadline 7 days ahead (9 October 10:29:44 UTC) | A | `3cmoTMHExw2Bh9w5yLFNngQAvbP5X5SiAvHgWXabHiEmfphXEZjp52ux6MQioaoMn8q8EdDAnBaHZtgjZc4671vY` | market `9uhHhArjBJ5Zbxqyo2k1bs1QWRBfXxdzGcxKaz492mjq`, left open for the page and the demo |
+| `stake` YES 0.004 SOL | A | `53mApDV5cx9ZyS4haQwHtp6svPQDSA9Jmdc6uPk8BtKX2SLhJs3HfK661GFhRMnP4dhu2R2WDythyVhXVDqfD3GQ` | |
+| `stake` NO 0.002 SOL | B | `3ps4wZEirUTnHaj14Ye6S1nTt8uGxPDHt8G3c8VKdJTTw8y1LfbSSu4LJEJxarDm8LrWarWHSesLyhtxPdaFGSp1` | YES shows 67 percent, NO 33 percent; YES pays 1.50x, NO 3.00x |
+| return 0.008 SOL to A | B | `3AUEeAA2PEeyshzeEPPWGiRFS4gHgrRwwQqC3hVeCCx3wxqqCPj3QETCitTHs3stYFaKQu89SQ7skaEoP1MWkbAo` | |
+
+The whole run cost wallet A 0.019 SOL (0.2363 to 0.2173 SOL), most of it the two markets' rent and the two open stakes. The pool did not graduate during the test (devnet curves rarely fill), so the YES branches of `resolve` are covered by the program's LiteSVM tests rather than a live transaction; the first market resolved NO by the deadline, which is the branch a short deadline exercises.
 
 ## Running it
 
@@ -149,9 +219,10 @@ Never cached. 400 for a string that is not a public key, 404 for an account that
 npm run dev                      # /curve shows "has not run yet" until a refresh
 npm run agent                    # one tick: the Panta scan, then the curve refresh (needs .env.local)
 npx tsx scripts/measure-curve.ts # one curve refresh with every byte counted by host
-npm test                         # tests/dbc.test.ts (decoding, fixtures from the IDL layouts) and tests/curve.test.ts (the index), no network
+npm test                         # tests/dbc.test.ts (decoding, fixtures from the IDL layouts), tests/curve.test.ts (the index) and tests/curve-market.test.ts (the market client), no network
+npx tsx scripts/curve-market-devnet.ts markets   # the markets on devnet and the wallet's positions
 ```
 
 To try it without the Panta scan, point `SONAR_STORE_FILE` at a scratch file and run the measure script; the dev server reading the same file then serves the index. Set `CHAIN_PROVIDER=solami` or `rpcfast` to pick the provider when both keys are present.
 
-Files: `src/lib/dbc.ts` (decoder and math), `src/lib/dbc-idl.json`, `src/lib/curve.ts` (index, refresh, reads), `src/app/api/curve/`, `src/app/(app)/curve/`, `src/components/CurveBits.tsx`, `src/components/CurvePoolView.tsx`, `tests/dbc.test.ts`, `tests/curve.test.ts`, `scripts/measure-curve.ts`.
+Files: `src/lib/dbc.ts` (decoder and math), `src/lib/dbc-idl.json`, `src/lib/curve.ts` (index, refresh, reads), `src/lib/curve-market.ts`, `src/lib/curve-market-math.ts`, `src/lib/curve-market-server.ts`, `src/app/api/curve/`, `src/app/(app)/curve/`, `src/components/CurveBits.tsx`, `src/components/CurvePoolView.tsx`, `src/components/CurveMarketPanel.tsx`, `tests/dbc.test.ts`, `tests/curve.test.ts`, `tests/curve-market.test.ts`, `scripts/measure-curve.ts`, `scripts/curve-market-devnet.ts`.

@@ -42,3 +42,27 @@ Colosseum project: https://colosseum.com/arena/projects/sonar-for-panta
 Builder: https://x.com/Great_ojies
 
 Powered by Panta: https://panta.market
+
+## Curve demo: 60-second shot list (to record)
+
+**Title:** Sonar Curve: graduation markets on Meteora DBC launches
+
+Record on devnet (`NEXT_PUBLIC_SOLANA_CLUSTER=devnet`, Phantom set to devnet, about 0.03 SOL in the wallet). Open a market a day ahead before recording so the panel already has odds to show; keep a second market with a deadline a few minutes away for the resolve and claim shots. One take, no cuts needed.
+
+| Time | Shot | Say |
+| --- | --- | --- |
+| 0:00 | `/curve`: the launch list, progress bars moving, a row with the "1 market" chip | "Sonar Curve follows token launches on Meteora's bonding curve: price, quote raised, how far each one is from graduation, decoded from the program's own events." |
+| 0:08 | Click the row; the pool page: price tile, graduation bar, the curve chart, the tape | "Every print on the curve, and the account fields that decide graduation." |
+| 0:16 | Scroll to the Graduation market panel; hover the devnet pill | "The question every launch carries: will it graduate before a date? These markets live in a Solana program with no oracle, no admin key and no fee. It is on devnet for now." |
+| 0:24 | Pick YES, type 0.01 SOL, Sign & stake; approve in Phantom; the row's odds and your stake update | "Stake the pool's own quote token on a side. SOL is wrapped inside the same transaction." |
+| 0:36 | Switch to the short-deadline market; the resolve box appears: "the deadline passed without a fill: resolve settles it NO"; Sign & resolve | "Anyone can resolve once the pool account answers the question. The program reads the DBC pool itself." |
+| 0:46 | The claim box: "You can claim 0.004 SOL"; Sign & claim; the transaction link | "Winners split the losing side pro rata and claim in one click. SOL comes back unwrapped." |
+| 0:54 | Back to `/curve` with the "settled" chip, then the `/api/curve/markets` JSON in a tab | "All of it is JSON for terminals. Program, tests and threat model are in the repo." |
+
+**Description (paste-ready):**
+
+Sonar Curve adds Meteora Dynamic Bonding Curve launches to Sonar: a live tape per pool decoded from the program's events, graduation progress read from the pool account, and on-chain parimutuel YES/NO markets on whether a curve graduates before a date. The `curve_market` program resolves from the DBC pool account alone, so there is no oracle, no admin key and no fee. Shown on devnet.
+
+Live app: https://sonarpanta.xyz/curve
+Program and docs: https://github.com/G-ojies/sonar-panta/tree/main/onchain
+Builder: https://x.com/Great_ojies
