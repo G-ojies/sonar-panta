@@ -554,14 +554,14 @@ fn claim_refund_returns_both_sides() {
 }
 
 #[test]
-fn claim_refund_when_only_losers_exist() {
+fn claim_pays_trader_holding_both_sides() {
     let mut fx = Fx::new(TOKEN_PROGRAM);
     fx.create().unwrap();
     let (a, a_tok) = fx.trader(10 * SOL);
     fx.stake(&a, a_tok, Side::Yes, SOL).unwrap();
     fx.stake(&a, a_tok, Side::No, SOL).unwrap();
-    // Deadline passes with NO winning, but YES total is non-zero and NO total
-    // is non-zero here, so this is a real NO resolution for a who holds both.
+    // Both totals are non-zero, so this is a real NO resolution. The trader
+    // wins their own YES stake back through the NO side.
     fx.time(fx.deadline + 1);
     fx.resolve().unwrap();
     assert_eq!(fx.market().state, MarketState::ResolvedNo);
