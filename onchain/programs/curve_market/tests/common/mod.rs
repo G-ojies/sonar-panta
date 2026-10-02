@@ -297,9 +297,15 @@ pub fn send(
     let msg = Message::new_with_blockhash(&[ix], Some(&signers[0].pubkey()), &blockhash);
     let tx = VersionedTransaction::try_new(VersionedMessage::Legacy(msg), signers)
         .map_err(|e| e.to_string())?;
-    svm.send_transaction(tx)
-        .map(|_| ())
-        .map_err(|e| format!("{:?} | {}", e.err, e.meta.logs.join(" / ")))
+    match svm.send_transaction(tx) {
+        Ok(meta) => {
+            if std::env::var_os("CURVE_CU").is_some() {
+                eprintln!("compute units: {}", meta.compute_units_consumed);
+            }
+            Ok(())
+        }
+        Err(e) => Err(format!("{:?} | {}", e.err, e.meta.logs.join(" / "))),
+    }
 }
 
 /// Assert that a failed send carries this program's error code.
