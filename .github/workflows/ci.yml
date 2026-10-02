@@ -21,3 +21,36 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+
+  # The curve_market program: build the SBF binary, then run the Rust tests
+  # (IDL offset pins, pure math, LiteSVM flows). No deploy, no network.
+  program:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: onchain
+    env:
+      SOLANA_VERSION: v3.1.14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry and build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cache/solana
+            onchain/target
+          key: curve-market-${{ runner.os }}-${{ env.SOLANA_VERSION }}-${{ hashFiles('onchain/Cargo.lock') }}
+          restore-keys: |
+            curve-market-${{ runner.os }}-${{ env.SOLANA_VERSION }}-
+      - name: Install the Solana toolchain
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/${SOLANA_VERSION}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - name: Build the program
+        run: cargo build-sbf
+      - name: Run the tests
+        run: cargo test

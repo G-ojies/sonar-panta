@@ -1,0 +1,962 @@
+{
+  "address": "DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp",
+  "metadata": {
+    "name": "curve_market",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Parimutuel YES/NO markets on Meteora Dynamic Bonding Curve graduation"
+  },
+  "instructions": [
+    {
+      "name": "claim",
+      "docs": [
+        "Pay out a position and close it to its owner. Winners get their stake",
+        "plus a pro-rata share of the losing side. Refund markets return both",
+        "sides. Losers get nothing but their rent back."
+      ],
+      "discriminator": [
+        62,
+        198,
+        214,
+        193,
+        213,
+        159,
+        108,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.pool",
+                "account": "Market"
+              },
+              {
+                "kind": "account",
+                "path": "market.deadline_ts",
+                "account": "Market"
+              }
+            ]
+          },
+          "relations": [
+            "position"
+          ]
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quote_mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "user_token",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_market",
+      "docs": [
+        "Open a market on `pool` with the question \"does the curve finish at or",
+        "before `deadline_ts`?\". Anyone can create one; the creator gets nothing",
+        "beyond a market to trade in."
+      ],
+      "discriminator": [
+        103,
+        226,
+        97,
+        235,
+        200,
+        188,
+        251,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "config",
+          "docs": [
+            "and the key must equal `pool.config`."
+          ]
+        },
+        {
+          "name": "quote_mint"
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "arg",
+                "path": "deadline_ts"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "deadline_ts",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "resolve",
+      "docs": [
+        "Settle the market from the pool account. Anyone can call it."
+      ],
+      "discriminator": [
+        246,
+        150,
+        236,
+        206,
+        108,
+        63,
+        58,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.pool",
+                "account": "Market"
+              },
+              {
+                "kind": "account",
+                "path": "market.deadline_ts",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "config",
+          "relations": [
+            "market"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "stake",
+      "docs": [
+        "Move `amount` of the quote token into the vault on `side`. The amount",
+        "credited is what the vault actually received, so a Token-2022 transfer",
+        "fee cannot inflate a position."
+      ],
+      "discriminator": [
+        206,
+        176,
+        202,
+        18,
+        200,
+        209,
+        179,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "market",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  114,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market.pool",
+                "account": "Market"
+              },
+              {
+                "kind": "account",
+                "path": "market.deadline_ts",
+                "account": "Market"
+              }
+            ]
+          }
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quote_mint",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "user_token",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "market"
+              }
+            ]
+          },
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "token_program",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "Side"
+            }
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Market",
+      "discriminator": [
+        219,
+        190,
+        213,
+        55,
+        0,
+        227,
+        198,
+        154
+      ]
+    },
+    {
+      "name": "Position",
+      "discriminator": [
+        170,
+        188,
+        143,
+        228,
+        122,
+        64,
+        247,
+        208
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Claimed",
+      "discriminator": [
+        217,
+        192,
+        123,
+        72,
+        108,
+        150,
+        248,
+        33
+      ]
+    },
+    {
+      "name": "MarketCreated",
+      "discriminator": [
+        88,
+        184,
+        130,
+        231,
+        226,
+        84,
+        6,
+        58
+      ]
+    },
+    {
+      "name": "Resolved",
+      "discriminator": [
+        148,
+        46,
+        187,
+        66,
+        35,
+        1,
+        255,
+        147
+      ]
+    },
+    {
+      "name": "Staked",
+      "discriminator": [
+        11,
+        146,
+        45,
+        205,
+        230,
+        58,
+        213,
+        240
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "PoolNotOwnedByDbc",
+      "msg": "The pool account is not owned by the DBC program"
+    },
+    {
+      "code": 6001,
+      "name": "PoolDiscriminator",
+      "msg": "The pool account does not start with the VirtualPool discriminator"
+    },
+    {
+      "code": 6002,
+      "name": "PoolLayout",
+      "msg": "The pool account is shorter than the VirtualPool layout"
+    },
+    {
+      "code": 6003,
+      "name": "ConfigNotOwnedByDbc",
+      "msg": "The config account is not owned by the DBC program"
+    },
+    {
+      "code": 6004,
+      "name": "ConfigDiscriminator",
+      "msg": "The config account does not start with the PoolConfig discriminator"
+    },
+    {
+      "code": 6005,
+      "name": "ConfigLayout",
+      "msg": "The config account is shorter than the PoolConfig layout"
+    },
+    {
+      "code": 6006,
+      "name": "ConfigMismatch",
+      "msg": "The config account does not match the pool's config field"
+    },
+    {
+      "code": 6007,
+      "name": "QuoteMintMismatch",
+      "msg": "The quote mint does not match the config's quote_mint field"
+    },
+    {
+      "code": 6008,
+      "name": "QuoteMintOwner",
+      "msg": "The quote mint is not owned by the given token program"
+    },
+    {
+      "code": 6009,
+      "name": "PoolAlreadyComplete",
+      "msg": "The pool has already graduated or finished its curve"
+    },
+    {
+      "code": 6010,
+      "name": "DeadlineInPast",
+      "msg": "The deadline is not in the future"
+    },
+    {
+      "code": 6011,
+      "name": "DeadlineTooFar",
+      "msg": "The deadline is more than 180 days away"
+    },
+    {
+      "code": 6012,
+      "name": "MarketNotOpen",
+      "msg": "The market is no longer open"
+    },
+    {
+      "code": 6013,
+      "name": "DeadlinePassed",
+      "msg": "The deadline has passed; the market cannot take new stakes"
+    },
+    {
+      "code": 6014,
+      "name": "StakeTooSmall",
+      "msg": "The stake is below the minimum"
+    },
+    {
+      "code": 6015,
+      "name": "NotYet",
+      "msg": "The pool has not graduated and the deadline has not passed"
+    },
+    {
+      "code": 6016,
+      "name": "NotResolved",
+      "msg": "The market has not been resolved"
+    },
+    {
+      "code": 6017,
+      "name": "PositionMarketMismatch",
+      "msg": "The position belongs to a different market"
+    },
+    {
+      "code": 6018,
+      "name": "AlreadyClaimed",
+      "msg": "The position has already been claimed"
+    },
+    {
+      "code": 6019,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6020,
+      "name": "VaultMismatch",
+      "msg": "The vault does not match the market"
+    },
+    {
+      "code": 6021,
+      "name": "PoolMismatch",
+      "msg": "The pool does not match the market"
+    }
+  ],
+  "types": [
+    {
+      "name": "Claimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MarketState"
+              }
+            }
+          },
+          {
+            "name": "yes_amount",
+            "type": "u64"
+          },
+          {
+            "name": "no_amount",
+            "type": "u64"
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "docs": [
+              "The DBC `VirtualPool` the market is about."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "docs": [
+              "The DBC `PoolConfig` the pool points at."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "docs": [
+              "The pool's quote mint. Stakes and payouts are in this token."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "docs": [
+              "The token program that owns `quote_mint` (Token or Token-2022)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "docs": [
+              "The market's token account holding every stake."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "docs": [
+              "Who created the market. Carries no rights."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "deadline_ts",
+            "docs": [
+              "Unix time. YES wins if the curve finishes at or before it."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "migration_quote_threshold",
+            "docs": [
+              "`migration_quote_threshold` read from the config at creation."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "yes_total",
+            "docs": [
+              "Sum of YES stakes actually received by the vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "no_total",
+            "docs": [
+              "Sum of NO stakes actually received by the vault."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "paid_out",
+            "docs": [
+              "Sum of payouts sent out of the vault so far."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MarketState"
+              }
+            }
+          },
+          {
+            "name": "resolved_at",
+            "docs": [
+              "Unix time of resolution, zero while open."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "vault_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "deadline_ts",
+            "type": "i64"
+          },
+          {
+            "name": "migration_quote_threshold",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Open"
+          },
+          {
+            "name": "ResolvedYes"
+          },
+          {
+            "name": "ResolvedNo"
+          },
+          {
+            "name": "Refund"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "yes_amount",
+            "type": "u64"
+          },
+          {
+            "name": "no_amount",
+            "type": "u64"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Resolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "state",
+            "type": {
+              "defined": {
+                "name": "MarketState"
+              }
+            }
+          },
+          {
+            "name": "yes_total",
+            "type": "u64"
+          },
+          {
+            "name": "no_total",
+            "type": "u64"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          },
+          {
+            "name": "is_migrated",
+            "type": "u8"
+          },
+          {
+            "name": "finish_curve_timestamp",
+            "type": "u64"
+          },
+          {
+            "name": "quote_reserve",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Yes"
+          },
+          {
+            "name": "No"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Staked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "market",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "yes_total",
+            "type": "u64"
+          },
+          {
+            "name": "no_total",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}
