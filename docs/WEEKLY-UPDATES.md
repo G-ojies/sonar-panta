@@ -71,6 +71,8 @@ matcher reports no match rather than a wrong one."
 
 ## Week 3 (from 2 October)
 
+Posted 2 October 2026: https://colosseum.com/arena/projects/sonar-for-panta/updates/1004 (with the Solami line and a Sonar Curve mention added), two images, tagged Looking for testers. X reply on the launch thread: https://x.com/Great_ojies/status/2105972184007254527.
+
 Colosseum takes weekly updates as posts on the project's Builder updates feed (one per project per 24 h, 4,000 characters, up to 4 images). Post the text below with two images: `public/screens/agent.png` (the replay record) and `public/screens/create-board.png` (a board loaded on Create in sandbox). Then reply to the X launch thread with the first paragraph and the link.
 
 ### Post text
