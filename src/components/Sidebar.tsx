@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 const nav = [
   { href: '/', label: 'Radar', icon: 'M4 12a8 8 0 1 1 16 0 8 8 0 0 1-16 0zm8-4v4l3 2', match: (p: string) => p === '/' || p.startsWith('/market') },
   { href: '/portfolio', label: 'Portfolio', icon: 'M4 7h16v12H4zM4 11h16M9 7V5h6v2', match: (p: string) => p.startsWith('/portfolio') },
+  { href: '/curve', label: 'Curve', icon: 'M4 18c6 0 10-2 12-8 1-3 2-4 4-4', match: (p: string) => p.startsWith('/curve') },
   { href: '/create', label: 'Create', icon: 'M12 5v14M5 12h14', match: (p: string) => p.startsWith('/create') },
   { href: '/agent', label: 'Agent', icon: 'M5 19l4-9 3 6 3-12 4 15', match: (p: string) => p.startsWith('/agent') },
 ];
