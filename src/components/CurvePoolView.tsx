@@ -2,15 +2,18 @@
 import Link from 'next/link';
 import type { CurvePool } from '@/lib/curve';
 import type { CurvePrint } from '@/lib/dbc';
-import { priceFromSqrt, progressPct } from '@/lib/dbc';
+import { priceFromSqrt, progressPct } from '@/lib/dbc-math';
 import { ago, dateShort, fmtBase, fmtPrice, fmtQuote, short } from '@/lib/format';
-import { explorerTx } from '@/lib/solana';
 import { useApi } from './useApi';
 import { ProgressBar, StatusChip } from './CurveBits';
 
 interface PoolPayload { program: string; pool: CurvePool; tape: CurvePrint[]; tapeUpdatedAt: number | null; tapeComplete: boolean; fresh: boolean; market: null }
 
-const account = (a: string) => `https://solscan.io/account/${a}`;
+// Solscan links without @/lib/solana, whose web3.js import would add 90 KB to this page
+const CLUSTER = process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? 'mainnet-beta';
+const suffix = CLUSTER === 'devnet' ? '?cluster=devnet' : '';
+const account = (a: string) => `https://solscan.io/account/${a}${suffix}`;
+const explorerTx = (sig: string) => `https://solscan.io/tx/${sig}${suffix}`;
 
 export function CurvePoolView({ address }: { address: string }) {
   const { data, error, loading, reload } = useApi<PoolPayload>(`/api/curve/pool/${address}`, [address], 30_000);

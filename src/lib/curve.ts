@@ -23,8 +23,8 @@
  * a day and quiet ones for CURVE_KEEP_HOURS. Pools listed in sonar:curve:pinned (the graduation markets, once the
  * program is wired) are never evicted. Any DBC pool can be asked for by address: it is read live, added, and followed.
  *
- * Budget per refresh with the defaults, measured in docs/CURVE.md: about 0.6 MB of JSON, a third of that on the
- * wire (the provider compresses), about 50 RPC calls paced to the plan's rate.
+ * Budget per refresh with the defaults, measured in docs/CURVE.md: about 0.5 MB of JSON, a third of that on the
+ * wire (the provider compresses), about 55 RPC calls paced to the plan's rate, at most one refresh per half hour.
  */
 import { rpc } from './chain-tape';
 import {
@@ -45,10 +45,12 @@ const env = (k: string, d: number) => { const n = Number(process.env[k]); return
 /** Signatures of the program read per refresh (one call, about 230 bytes of JSON each). */
 const SCAN_SIGNATURES = () => env('CURVE_SCAN_SIGNATURES', 100);
 /** Successful transactions fetched and decoded per refresh (about 8.5 KB of JSON each). */
-const SCAN_TXS = () => env('CURVE_SCAN_TXS', 30);
+const SCAN_TXS = () => env('CURVE_SCAN_TXS', 20);
 /** Pools whose tape is refreshed per scan, and the transactions each may cost. */
-const TAPES_PER_SCAN = () => env('CURVE_TAPES_PER_SCAN', 4);
-const TAPE_TXS = () => env('CURVE_TAPE_TXS', 10);
+const TAPES_PER_SCAN = () => env('CURVE_TAPES_PER_SCAN', 3);
+const TAPE_TXS = () => env('CURVE_TAPE_TXS', 8);
+/** Least seconds between two refreshes on the tick: about one tick in two, which halves the month's bytes. */
+const MIN_INTERVAL_S = () => env('CURVE_MIN_INTERVAL_S', 1800);
 const TAPE_SIGNATURES = 25;
 const TAPE_CAP = 200;
 const INDEX_MAX = () => env('CURVE_INDEX_MAX', 150);
@@ -370,10 +372,14 @@ export async function refreshCurve(): Promise<CurveIndex> {
 /** On unless SONAR_CURVE=off: the tick then skips the DBC sample and the /curve page says the index has not run. */
 export const curveEnabled = (env: Record<string, string | undefined> = process.env) => env.SONAR_CURVE !== 'off';
 
-/** The refresh as the tick runs it: after the Panta work, never throwing, so Curve can never break the radar. */
-export async function curveTick(): Promise<CurveIndex | null> {
+/** The refresh as the tick runs it: after the Panta work, at most once per CURVE_MIN_INTERVAL_S, never throwing, so Curve can never break the radar. */
+export async function curveTick(now = Date.now() / 1000): Promise<CurveIndex | null> {
   if (!curveEnabled()) return null;
-  try { return await refreshCurve(); } catch (e) { console.error('curve refresh failed', (e as Error).message); return null; }
+  try {
+    const last = (await readIndex())?.updatedAt ?? 0;
+    if (now - last < MIN_INTERVAL_S()) return null;
+    return await refreshCurve();
+  } catch (e) { console.error('curve refresh failed', (e as Error).message); return null; }
 }
 
 // ---- reads ----

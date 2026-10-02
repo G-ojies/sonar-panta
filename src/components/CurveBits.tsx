@@ -1,7 +1,7 @@
 'use client';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { CurveStatus } from '@/lib/dbc';
+import type { CurveStatus } from '@/lib/dbc-math';
 
 /** Base-58 check, the same rule the API applies. */
 const isPubkey = (s: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);

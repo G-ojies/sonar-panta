@@ -120,6 +120,7 @@ npm test
 - [docs/DEPLOY.md](docs/DEPLOY.md): Vercel + Upstash + GitHub Actions.
 - [docs/RPCFAST.md](docs/RPCFAST.md): RPC Fast as the chain data path, env vars, plan limits and compute-unit use, running it with your own key.
 - [docs/SOLAMI.md](docs/SOLAMI.md): the same for Solami, plus stream health field by field.
+- [docs/CURVE.md](docs/CURVE.md): Sonar Curve, the Meteora DBC module: how launches are found and followed, how the tape is decoded from the program's events, the `/api/curve` routes, cadence and bandwidth.
 
 ## Stack
 

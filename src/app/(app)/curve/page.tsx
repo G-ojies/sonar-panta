@@ -7,7 +7,7 @@ import { ago, fmtPrice, fmtQuote, short } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
-const CURVE_SCAN_TXS = Number(process.env.CURVE_SCAN_TXS ?? 30);
+const CURVE_SCAN_TXS = Number(process.env.CURVE_SCAN_TXS ?? 20);
 
 export default async function CurvePage({ searchParams }: { searchParams?: { status?: string } }) {
   const idx = await readCurve();
