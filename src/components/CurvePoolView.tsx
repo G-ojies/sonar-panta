@@ -6,8 +6,10 @@ import { priceFromSqrt, progressPct } from '@/lib/dbc-math';
 import { ago, dateShort, fmtBase, fmtPrice, fmtQuote, short } from '@/lib/format';
 import { useApi } from './useApi';
 import { ProgressBar, StatusChip } from './CurveBits';
+import { CurveMarketPanel } from './CurveMarketPanel';
+import type { MarketsPayload } from '@/lib/curve-market-server';
 
-interface PoolPayload { program: string; pool: CurvePool; tape: CurvePrint[]; tapeUpdatedAt: number | null; tapeComplete: boolean; fresh: boolean; market: null }
+interface PoolPayload { program: string; pool: CurvePool; tape: CurvePrint[]; tapeUpdatedAt: number | null; tapeComplete: boolean; fresh: boolean; markets: MarketsPayload | null }
 
 // Solscan links without @/lib/solana, whose web3.js import would add 90 KB to this page
 const CLUSTER = process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? 'mainnet-beta';
@@ -117,22 +119,8 @@ export function CurvePoolView({ address }: { address: string }) {
         </div>
 
         <aside className="space-y-4">
-          {/* CURVE-MARKET: the graduation market panel (create, stake YES or NO, resolve, claim) mounts here once the
-              curve_market program lands from the curve-program branch. The API payload carries `market: null` for it. */}
-          <section className="card p-5">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-medium">Graduation market</h2>
-              <span className="pill pill-amber">coming</span>
-            </div>
-            <p className="mt-2 text-sm leading-relaxed text-fog">
-              Will this curve graduate before a date? On-chain YES and NO markets are on the way: stake {p.quote.symbol} on a side, and the losing side pays the winners pro rata. The market resolves from this pool account alone, no oracle, using the same fields shown above.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-3 opacity-60" aria-hidden>
-              <div className="price-tile price-yes"><span>Yes</span><strong>--</strong></div>
-              <div className="price-tile price-no"><span>No</span><strong>--</strong></div>
-            </div>
-            <p className="mt-3 text-[11px] leading-relaxed text-fog-2">The program (`curve_market`, Anchor) is being built with a threat model and tests before anything holds a stake. Nothing to sign yet.</p>
-          </section>
+          {/* CURVE-MARKET: the graduation markets from the curve_market program (open, stake YES or NO, resolve, claim) */}
+          <CurveMarketPanel pool={p} initial={data.markets} />
           <section className="card p-5">
             <h2 className="font-medium">Largest prints</h2>
             {p.largest.length === 0 ? <p className="mt-2 text-sm text-fog">None decoded yet.</p> : (

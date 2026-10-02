@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Masthead, Strip, agoWords, cap, plural, words } from '@/components/Desk';
 import { CurveLookup, ProgressBar, StatusChip } from '@/components/CurveBits';
 import { curveEnabled, rankPools, readCurve, type CurvePool } from '@/lib/curve';
+import { MARKET_CLUSTER, marketCountsByPool } from '@/lib/curve-market-server';
 import { DBC_PROGRAM } from '@/lib/dbc';
 import { ago, fmtPrice, fmtQuote, short } from '@/lib/format';
 
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
 const CURVE_SCAN_TXS = Number(process.env.CURVE_SCAN_TXS ?? 20);
 
 export default async function CurvePage({ searchParams }: { searchParams?: { status?: string } }) {
-  const idx = await readCurve();
+  const [idx, marketCounts] = await Promise.all([readCurve(), marketCountsByPool().catch(() => ({} as Record<string, { open: number; total: number }>))]);
   const now = Date.now() / 1000;
   const all = rankPools(Object.values(idx?.pools ?? {}));
   const status = ['trading', 'complete', 'migrated'].includes(searchParams?.status ?? '') ? searchParams!.status : undefined;
@@ -20,6 +21,8 @@ export default async function CurvePage({ searchParams }: { searchParams?: { sta
   const complete = all.filter((p) => p.status === 'complete').length;
   const migrated = all.filter((p) => p.status === 'migrated').length;
   const created = all.filter((p) => p.foundBy === 'creation').length;
+  const withMarkets = all.filter((p) => marketCounts[p.address]).length;
+  const openMarkets = Object.values(marketCounts).reduce((n, c) => n + c.open, 0);
 
   const title = !idx
     ? (curveEnabled() ? 'The curve index has not run yet.' : 'The curve index is switched off.')
@@ -50,6 +53,7 @@ export default async function CurvePage({ searchParams }: { searchParams?: { sta
             { k: 'Complete', v: complete },
             { k: 'Graduated', v: migrated },
             { k: 'Seen created', v: created, title: 'Pools whose creation was in a sample' },
+            { k: 'With markets', v: withMarkets, tone: withMarkets ? 'ping' : undefined, title: `${openMarkets} open graduation ${plural(openMarkets, 'market')} on ${MARKET_CLUSTER}` },
             { k: 'Last sample', v: `${idx.sample.transactions} tx`, title: `${idx.sample.signatures} signatures read, ${idx.sample.prints} prints decoded, ${idx.sample.creations} creations` },
           ]} />
         )}
@@ -82,13 +86,13 @@ export default async function CurvePage({ searchParams }: { searchParams?: { sta
                   </tr>
                 </thead>
                 <tbody>
-                  {pools.map((p) => <Row key={p.address} p={p} now={now} />)}
+                  {pools.map((p) => <Row key={p.address} p={p} now={now} markets={marketCounts[p.address]} />)}
                 </tbody>
               </table>
             </div>
             {/* narrow: cards */}
             <ul className="divide-y divide-line md:hidden">
-              {pools.map((p) => <Card key={p.address} p={p} now={now} />)}
+              {pools.map((p) => <Card key={p.address} p={p} now={now} markets={marketCounts[p.address]} />)}
             </ul>
           </>
         )}
@@ -102,8 +106,15 @@ export default async function CurvePage({ searchParams }: { searchParams?: { sta
 }
 
 const ageOf = (p: CurvePool, now: number) => (p.createdAt ? `${p.createdFrom === 'slot' ? '~' : ''}${ago(now - p.createdAt)}` : `seen ${ago(now - p.firstSeenAt)}`);
+type Counts = { open: number; total: number } | undefined;
 
-function Row({ p, now }: { p: CurvePool; now: number }) {
+/** A chip when the pool has graduation markets on the curve_market program: open ones in blue, only settled ones in grey. */
+function MarketChip({ c }: { c: Counts }) {
+  if (!c) return null;
+  return <span className={`chip ${c.open ? 'bg-ping/15 text-ping' : 'bg-ink-3 text-fog'}`} title={`${c.open} open of ${c.total} graduation ${plural(c.total, 'market')} on ${MARKET_CLUSTER}`}>{c.open ? `${c.open} ${plural(c.open, 'market')}` : 'settled'}</span>;
+}
+
+function Row({ p, now, markets }: { p: CurvePool; now: number; markets: Counts }) {
   const big = p.largest[0];
   return (
     <tr className="border-b border-line/60 last:border-0 hover:bg-ink-3/40">
@@ -111,7 +122,7 @@ function Row({ p, now }: { p: CurvePool; now: number }) {
         <Link href={`/curve/${p.address}`} className="mono text-paper no-underline hover:underline">{short(p.baseMint, 5)}</Link>
         <div className="text-[11px] text-fog-2">by <span className="mono">{short(p.creator)}</span> · {p.quote.symbol} curve</div>
       </td>
-      <td className="px-3 py-2.5"><StatusChip status={p.status} /></td>
+      <td className="px-3 py-2.5"><span className="flex flex-wrap gap-1"><StatusChip status={p.status} /><MarketChip c={markets} /></span></td>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-2">
           <ProgressBar pct={p.progressPct} status={p.status} />
@@ -127,13 +138,13 @@ function Row({ p, now }: { p: CurvePool; now: number }) {
   );
 }
 
-function Card({ p, now }: { p: CurvePool; now: number }) {
+function Card({ p, now, markets }: { p: CurvePool; now: number; markets: Counts }) {
   return (
     <li className="px-4 py-3">
       <Link href={`/curve/${p.address}`} className="block no-underline hover:no-underline">
         <div className="flex items-center justify-between gap-2">
           <span className="mono text-sm text-paper">{short(p.baseMint, 5)}</span>
-          <StatusChip status={p.status} />
+          <span className="flex gap-1"><MarketChip c={markets} /><StatusChip status={p.status} /></span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <ProgressBar pct={p.progressPct} status={p.status} />
