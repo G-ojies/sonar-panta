@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readAgent, runAgent, summarize } from '@/lib/agent';
 import { readBacktest, runBacktest } from '@/lib/backtest';
+import { curveTick } from '@/lib/curve';
 import { store } from '@/lib/store';
 import { fail } from '../_util';
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export async function GET() {
 }
 
 /**
- * One tick: refresh the radar, settle and open paper positions, re-run the backtest every sixth run.
+ * One tick: refresh the radar, settle and open paper positions, re-run the backtest every sixth run, then refresh the curve index.
  * Authorization: Bearer CRON_SECRET or ?key=. Answers 202 at once and finishes in the background, so
  * any pinger with a short timeout can drive it; ?wait=1 blocks until the tick is done, ?force=1 runs one
  * even if the last was recent.
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
       try {
         const st = await runAgent();
         if (st.runs % 6 === 1) await runBacktest();
+        await curveTick(); // the Meteora DBC index rides the same tick (src/lib/curve.ts)
       } catch (e) { console.error('tick failed', (e as Error).message); }
       finally { await s.del(LOCK).catch(() => {}); }
     })();
