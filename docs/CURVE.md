@@ -6,7 +6,18 @@ Nothing here needs an SDK or an indexer. The program's IDL (`src/lib/dbc-idl.jso
 
 ## The program
 
-`dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`, the same id on mainnet and devnet. A launch is a `VirtualPool` account holding a base token and a quote token (SOL or USDC in practice) with a constant-product curve in `sqrt_price` space. Traders buy and sell along it; when the quote the pool holds reaches the config's `migration_quote_threshold`, the curve is complete and the liquidity migrates to a Meteora DAMM v2 pool. That is graduation.
+`dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN`, the same id on mainnet and devnet. A launch is a pool account holding a base token and a quote token (SOL or USDC in practice) with a constant-product curve in `sqrt_price` space. Traders buy and sell along it; when the quote the pool holds reaches the config's `migration_quote_threshold`, the curve is complete and the liquidity migrates to a Meteora DAMM v2 pool. That is graduation.
+
+A pool comes in two kinds, and Sonar reads both:
+
+| Kind | Pool account | Config account | Created by | Swapped by |
+| --- | --- | --- | --- | --- |
+| plain | `VirtualPool` | `PoolConfig` | `initialize_virtual_pool_with_spl_token` / `_with_token2022` | `swap`, `swap2` |
+| transfer hook | `TransferHookPool` (a Token-2022 base mint with a transfer hook) | `ConfigWithTransferHook` | `initialize_virtual_pool_with_token2022_transfer_hook` | `swap2_with_transfer_hook` |
+
+Both pool accounts wrap the same `PoolState` and are 424 bytes; `ConfigWithTransferHook` is a whole `PoolConfig` followed by the hook program and padding. So price, progress and graduation read identically for both, and only the discriminators, the config length and the event names differ. The DBC only creates a `TransferHookPool` under a `ConfigWithTransferHook` and a `VirtualPool` under a `PoolConfig`.
+
+On 3 October 2026 the program owned 1,728,254 `VirtualPool` and 2,033 `TransferHookPool` accounts on mainnet, and 85,333 and 1,044 on devnet. By traffic the picture flips on devnet: in a spread sample of 60 recent successful transactions, 45 of 53 swaps on devnet were `swap2_with_transfer_hook`, against 1 of 59 on mainnet.
 
 Measured on 2 October 2026: the program sees about 11 transactions a second, a quarter of them failed (bot swaps that lost a race), and a pool creation is about 0.6 percent of the successful ones (6 in a sample of 1,000). Every creation in that sample was signed and paid by the creator's own wallet, direct to the program, under a different config. Curves with the common 11.51 SOL threshold filled and migrated within minutes of being met.
 
@@ -24,20 +35,37 @@ The DBC program emits events with Anchor's `emit_cpi!`, not `emit!`. So there is
 
 `eventsFromTx` in `src/lib/dbc.ts` walks `meta.innerInstructions`, keeps the instructions addressed to the program that start with the tag, and decodes the rest against the IDL. `Program data:` lines are decoded too, in case a build ever uses `emit!`. A `swap2` instruction emits both the legacy `EvtSwap` and `EvtSwap2`; only `EvtSwap2` becomes a print (it carries the reserve and the threshold after the swap). Transactions are fetched with `maxSupportedTransactionVersion: 1`; the node already serves version 1 transactions.
 
+The transfer-hook instructions emit their own event types, with bodies identical to the plain ones (the tests compare the IDL types field by field). `decodeEvent` reports each under the plain name it mirrors and keeps the IDL's own name in `idlName`, so the index and the tape treat a transfer-hook swap or creation exactly like a plain one:
+
+| IDL event | Read as |
+| --- | --- |
+| `EvtSwap2WithTransferHook` `[134,59,168,120,94,51,114,231]` | `EvtSwap2` |
+| `EvtInitializePoolWithTransferHook` `[213,137,164,53,193,74,15,110]` | `EvtInitializePool` |
+| `EvtCurveCompleteWithTransferHook` `[59,47,109,205,13,31,44,159]` | `EvtCurveComplete` |
+
 ### Events used
 
 | Event | What Sonar takes from it |
 | --- | --- |
-| `EvtInitializePool` | pool, config, creator, base mint, activation point: a launch enters the index with its creation time |
-| `EvtSwap2` | pool, trade direction, amounts in and out, `next_sqrt_price`, `quote_reserve_amount`, `migration_threshold`: one print, with price and progress after it |
+| `EvtInitializePool` (or its transfer-hook twin) | pool, config, creator, base mint, activation point: a launch enters the index with its creation time |
+| `EvtSwap2` (or `EvtSwap2WithTransferHook`) | pool, trade direction, amounts in and out, `next_sqrt_price`, `quote_reserve_amount`, `migration_threshold`: one print, with price and progress after it |
 | `EvtSwap` | the legacy swap, turned into a print only when no `EvtSwap2` came with it (no reserve figures then) |
-| `EvtCurveComplete` | decoded and available; the account's `finish_curve_timestamp` says the same thing and is what the status reads |
+| `EvtCurveComplete` (or its transfer-hook twin) | decoded and available; the account's `finish_curve_timestamp` says the same thing and is what the status reads |
 
 `trade_direction` 1 is quote to base, a buy; 0 is base to quote, a sell. On a buy the quote that moved is `included_fee_input_amount` (what the trader paid, fee included) and the base is `output_amount`; on a sell the other way round.
 
 ### Accounts
 
-`VirtualPool` (discriminator `[213,224,5,209,98,69,119,92]`) and `PoolConfig` (`[26,108,14,123,116,230,129,43]`) are bytemuck accounts. Their Rust layouts carry explicit padding so no implicit alignment padding exists, which is what lets the same sequential reader decode them; the sizes the IDL implies, 424 and 1,048 bytes with the discriminator, match the live accounts exactly. Offsets after the discriminator that a program reading the pool needs (`offsetOf` in `dbc.ts` computes them from the IDL):
+All four are bytemuck accounts. Their Rust layouts carry explicit padding so no implicit alignment padding exists, which is what lets the same sequential reader decode them; the sizes the IDL implies match the live accounts exactly.
+
+| Account | Discriminator | Bytes with the discriminator |
+| --- | --- | --- |
+| `VirtualPool` | `[213,224,5,209,98,69,119,92]` | 424 |
+| `TransferHookPool` | `[237,219,184,23,42,189,169,35]` | 424 |
+| `PoolConfig` | `[26,108,14,123,116,230,129,43]` | 1,048 |
+| `ConfigWithTransferHook` | `[40,220,194,251,41,199,123,253]` | 1,128 |
+
+`decodePool` picks the pool kind by discriminator and returns the `PoolState` with a `kind` (`virtual` or `transferHook`); `decodeConfig` does the same for the two configs and adds `transfer_hook_program` for the hook one. `decodeVirtualPool`, `decodeTransferHookPool` and `decodePoolConfig` stay strict about their one account. Offsets after the discriminator that a program reading the pool needs (`offsetOf` in `dbc.ts` computes them from the IDL). They are the same for both pool kinds, and the config ones are the same inside `ConfigWithTransferHook`, whose `config` field starts at 0; its `transfer_hook_program` is at 1,040.
 
 | Field | Offset | Type |
 | --- | --- | --- |
@@ -98,7 +126,7 @@ Query: `status=trading|complete|migrated`, `limit` (default 100, max 500). Cache
   "sample": { "signatures": 100, "transactions": 20, "creations": 0, "prints": 32, "pools": 2 },
   "kept": 7,
   "pools": [{
-    "address": "BSTNBGAymY8PfNCMUTnr9y6tdCPZpRnELeN7zxaYUgUa",
+    "address": "BSTNBGAymY8PfNCMUTnr9y6tdCPZpRnELeN7zxaYUgUa", "kind": "virtual",
     "config": "...", "creator": "...", "baseMint": "...",
     "quote": { "mint": "So11111111111111111111111111111111111111112", "symbol": "SOL", "decimals": 9 }, "baseDecimals": 6,
     "createdAt": 1790933100, "createdFrom": "slot",
@@ -116,11 +144,11 @@ Query: `status=trading|complete|migrated`, `limit` (default 100, max 500). Cache
 }
 ```
 
-Rows come trading pools nearest graduation first, then complete, then migrated. `prints` counts what Sonar has decoded for the pool, bounded, not the pool's lifetime count. Before the first refresh the body is `{ "pools": [], "note": "the curve index has not run yet" }`.
+`kind` is `virtual` for a `VirtualPool` and `transferHook` for a `TransferHookPool`. Rows come trading pools nearest graduation first, then complete, then migrated. `prints` counts what Sonar has decoded for the pool, bounded, not the pool's lifetime count. Before the first refresh the body is `{ "pools": [], "note": "the curve index has not run yet" }`.
 
 ### `GET /api/curve/pool/<address>`
 
-Never cached. 400 for a string that is not a public key, 404 for an account that is not a `VirtualPool`.
+Never cached. 400 for a string that is not a public key, 404 for an account that is not a DBC pool of either kind.
 
 ```json
 {
@@ -161,7 +189,7 @@ Query: `pool=<address>` for one pool's markets (all of them otherwise), `user=<w
 ## Pages
 
 - `/curve`: the index as a list, with a status filter, a progress bar per pool, quote raised against the threshold, price, prints seen, the largest print and age. A table on wide screens, cards on phones. A lookup box opens any pool address.
-- `/curve/<address>`: price, the graduation progress with what is left to raise, the price path drawn from the tape, the account fields behind graduation, the tape, the largest prints, and the graduation market panel. Polls its API every 30 seconds, the markets every 15. A row on `/curve` carries a "1 market" chip when the pool has open markets and "settled" when it only has resolved ones.
+- `/curve/<address>`: price, the graduation progress with what is left to raise, the price path drawn from the tape, the account fields behind graduation (including which pool account it is), the tape, the largest prints, and the graduation market panel. Polls its API every 30 seconds, the markets every 15. A row on `/curve` carries a "1 market" chip when the pool has open markets and "settled" when it only has resolved ones.
 
 ## Graduation markets
 
@@ -188,7 +216,7 @@ SOLANA_RPC=https://api.devnet.solana.com RPCFAST_API_KEY= SOLAMI_API_KEY= \
 KV_REST_API_URL= KV_REST_API_TOKEN= SONAR_STORE_FILE=/tmp/sonar-devnet.json npm run dev
 ```
 
-The empty keys keep the DBC index off the mainnet providers and the scratch store keeps devnet pools out of the production Redis. Run `npx tsx scripts/measure-curve.ts` with the same variables to index devnet pools once; the pools with markets are pinned, so every refresh follows them. Most DBC traffic on devnet is the newer `TransferHookPool` account type (discriminator `[237,219,184,23,42,189,169,35]`, also 424 bytes), which neither the index nor the program accepts; `VirtualPool` launches are rarer there.
+The empty keys keep the DBC index off the mainnet providers and the scratch store keeps devnet pools out of the production Redis. Run `npx tsx scripts/measure-curve.ts` with the same variables to index devnet pools once; the pools with markets are pinned, so every refresh follows them. Most swaps on devnet are on `TransferHookPool`s, which the index, the pool page and the program source all accept. The devnet deployment of the program predates that support, though: until it is upgraded (see [CURVE-PROGRAM.md](CURVE-PROGRAM.md#deploy)), `create_market` on a `TransferHookPool` fails with error 6001 and the panel says the pool is not a pool the program accepts.
 
 `scripts/curve-market-devnet.ts` drives the program from a keypair file with the same builders the panel uses (`markets`, `create`, `stake`, `resolve`, `claim`, `fund`), which is how the run below was made.
 
@@ -213,13 +241,24 @@ The empty keys keep the DBC index off the mainnet providers and the scratch stor
 
 The whole run cost wallet A 0.019 SOL (0.2363 to 0.2173 SOL), most of it the two markets' rent and the two open stakes. The pool did not graduate during the test (devnet curves rarely fill), so the YES branches of `resolve` are covered by the program's LiteSVM tests rather than a live transaction; the first market resolved NO by the deadline, which is the branch a short deadline exercises.
 
+### Checked against real transfer-hook pools
+
+3 October 2026, read-only over the public endpoints:
+
+- **Accounts.** A spread sample of 40 `TransferHookPool`s on each cluster (out of 2,033 on mainnet and 1,044 on devnet) decoded with `decodePool`: every one was 424 bytes, owned by the DBC program, and named a 1,128-byte `ConfigWithTransferHook` that `decodeConfig` read with a non-empty hook program. Every `sqrt_price` sat between the config's `sqrt_start_price` and `migration_sqrt_price`; every migrated pool had `finish_curve_timestamp` set and `quote_reserve` at or over its threshold; quote mints were SOL, USDC and a few devnet test mints, with sane decimals.
+- **Reserve against the vault.** For four live pools (two each cluster) the decoded `quote_reserve` was a little under the quote vault's token balance, the difference being uncollected fees: for example `CoDRjxTHeLwC77RrP5Jg223UtdJqDUv2G437TESptKVi` on mainnet, 11.569203035 SOL reserve against 11.636115322 SOL in the vault.
+- **Tape.** The same pools' recent transactions decoded to `EvtSwap2WithTransferHook` prints, and the newest print's `quote_reserve_amount` equalled the account's `quote_reserve` to the lamport (11,569,203,035 on that pool). The swap that filled `F5LrNe6vAGKdgLjwvwH9HaBhxVorAwHrSLfEHPx85NhG` (mainnet, USDC) carried `EvtCurveCompleteWithTransferHook`, and its reserve after matched the migrated account.
+- **Pool read.** `readPool` (behind `/api/curve/pool/<address>`) served both of those pools from a cold store: `kind` `transferHook`, the trading one at 0.17 percent with a five-print tape, the other `migrated` at 100 percent. Before this change both returned 404.
+
+The two mainnet accounts and their configs are kept as a fixture (`onchain/programs/curve_market/tests/fixtures/transfer_hook_pools.json`, hex, with the slot) that both the TypeScript tests and the program's tests decode.
+
 ## Running it
 
 ```
 npm run dev                      # /curve shows "has not run yet" until a refresh
 npm run agent                    # one tick: the Panta scan, then the curve refresh (needs .env.local)
 npx tsx scripts/measure-curve.ts # one curve refresh with every byte counted by host
-npm test                         # tests/dbc.test.ts (decoding, fixtures from the IDL layouts), tests/curve.test.ts (the index) and tests/curve-market.test.ts (the market client), no network
+npm test                         # tests/dbc.test.ts (decoding both pool kinds, fixtures from the IDL layouts and real accounts), tests/curve.test.ts (the index) and tests/curve-market.test.ts (the market client), no network
 npx tsx scripts/curve-market-devnet.ts markets   # the markets on devnet and the wallet's positions
 ```
 

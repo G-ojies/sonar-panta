@@ -8,14 +8,25 @@ Parimutuel YES/NO markets on one question: will a Meteora Dynamic Bonding Curve 
 | DBC program id (devnet and mainnet) | `dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN` |
 | Source | `onchain/programs/curve_market/` |
 | Framework | Anchor 1.0.2 (CLI 1.0.1), solana-cli 3.1.14, platform-tools v1.52 |
-| Binary | 264,064 bytes (`opt-level = "z"`) |
-| Tests | 45 (`cd onchain && cargo test`), LiteSVM, no network |
+| Binary | 265,480 bytes (`opt-level = "z"`); the devnet deployment is the 264,064-byte build from before transfer-hook pools, see [Deploy](#deploy) |
+| Tests | 72 (`cd onchain && cargo test`), LiteSVM, no network |
 
 ## How the DBC pool is read
 
 The program never deserialises a whole DBC account. It checks the owner, the 8-byte discriminator and the minimum length, then reads a handful of fields at fixed offsets. The offsets come from the official IDL at `onchain/dbc-idl.json` (program version 0.2.1) and were checked against live pool accounts on devnet and mainnet.
 
-`VirtualPool` (424 bytes, discriminator `[213,224,5,209,98,69,119,92]`), absolute offsets including the discriminator:
+A DBC pool is one of two kinds, and the program accepts both:
+
+| Kind (`dbc::PoolKind`) | Pool account | Discriminator | Bytes | Config account | Discriminator | Bytes |
+| --- | --- | --- | --- | --- | --- | --- |
+| `Virtual` | `VirtualPool` | `[213,224,5,209,98,69,119,92]` | 424 | `PoolConfig` | `[26,108,14,123,116,230,129,43]` | 1,048 |
+| `TransferHook` | `TransferHookPool` | `[237,219,184,23,42,189,169,35]` | 424 | `ConfigWithTransferHook` | `[40,220,194,251,41,199,123,253]` | 1,128 |
+
+A `TransferHookPool` is a launch whose base mint is a Token-2022 mint with a transfer hook. Both pool accounts wrap the same `PoolState`, so the pool offsets below serve both. `ConfigWithTransferHook` is a whole `PoolConfig` (its first field, at the same offsets) followed by `transfer_hook_program` (32 bytes at 1,048) and `[u64; 6]` of padding, so the config offsets serve both too. `parse_pool` and `parse_config` choose the kind from the discriminator and refuse every other discriminator, then require the length of that kind. The DBC only creates a `TransferHookPool` under a `ConfigWithTransferHook` and a `VirtualPool` under a `PoolConfig`, and `read_pool_and_config` requires the pool's and the config's kinds to match.
+
+The market only ever stakes the pool's quote token (SOL or USDC in practice); the base mint and its hook are never touched, so a transfer-hook pool needs nothing more than reading its accounts.
+
+Pool offsets (both kinds), absolute including the discriminator:
 
 | Field | Offset | Size | Used for |
 | --- | --- | --- | --- |
@@ -24,14 +35,14 @@ The program never deserialises a whole DBC account. It checks the owner, the 8-b
 | `is_migrated` | 305 | 1 | 1 once the pool has moved to DAMM |
 | `finish_curve_timestamp` | 344 | 8 | unix time the curve completed, 0 while open |
 
-`PoolConfig` (1,048 bytes, discriminator `[26,108,14,123,116,230,129,43]`):
+Config offsets (`PoolConfig`, and the `PoolConfig` inside `ConfigWithTransferHook`):
 
 | Field | Offset | Size | Used for |
 | --- | --- | --- | --- |
 | `quote_mint` | 8 | 32 | must equal the `quote_mint` account passed in |
 | `migration_quote_threshold` | 264 | 8 | the quote amount that completes the curve |
 
-`tests/layout.rs` rebuilds both layouts from the IDL JSON at test time and asserts every constant in `src/dbc.rs`, so a DBC upgrade that moves a field fails CI before it can mis-resolve a market.
+`tests/layout.rs` rebuilds the four layouts from the IDL JSON at test time and asserts every constant in `src/dbc.rs` (for `ConfigWithTransferHook` through its nested `config` field), so a DBC upgrade that moves a field fails CI before it can mis-resolve a market. It also parses two real mainnet `TransferHookPool`s and their configs, kept as hex in `tests/fixtures/transfer_hook_pools.json`.
 
 ## Accounts and seeds
 
@@ -51,9 +62,9 @@ All PDAs are re-derived from stored bumps on every instruction. The creator is r
 
 ### `create_market(deadline_ts: i64)`
 
-Accounts: `creator` (signer, pays rent), `pool` (DBC `VirtualPool`), `config` (DBC `PoolConfig`), `quote_mint`, `market` (init), `vault` (init), `token_program`, `system_program`.
+Accounts: `creator` (signer, pays rent), `pool` (DBC `VirtualPool` or `TransferHookPool`), `config` (DBC `PoolConfig` or `ConfigWithTransferHook`), `quote_mint`, `market` (init), `vault` (init), `token_program`, `system_program`.
 
-Checks, in order: deadline is after the clock and at most 180 days ahead; `pool` is owned by the DBC program, carries the `VirtualPool` discriminator and is at least 424 bytes; `config` equals `pool.config`, is owned by the DBC program and carries the `PoolConfig` discriminator; `quote_mint` equals `config.quote_mint` and is owned by `token_program`; the pool is not already complete (`is_migrated == 0`, `finish_curve_timestamp == 0`, `quote_reserve < migration_quote_threshold`).
+Checks, in order: deadline is after the clock and at most 180 days ahead; `pool` is owned by the DBC program, carries the `VirtualPool` or `TransferHookPool` discriminator and is at least 424 bytes; `config` equals `pool.config`, is owned by the DBC program, carries the `PoolConfig` or `ConfigWithTransferHook` discriminator and is at least that kind's length (1,048 or 1,128 bytes); the pool and the config are the same kind (`PoolKindMismatch` otherwise); `quote_mint` equals `config.quote_mint` and is owned by `token_program`; the pool is not already complete (`is_migrated == 0`, `finish_curve_timestamp == 0`, `quote_reserve < migration_quote_threshold`).
 
 Emits `MarketCreated`.
 
@@ -67,7 +78,7 @@ Emits `Staked`.
 
 ### `resolve()`
 
-Accounts: `market`, `pool` (must equal `market.pool`), `config` (must equal `market.config`). No signer beyond the fee payer; anyone may call it once.
+Accounts: `market`, `pool` (must equal `market.pool`), `config` (must equal `market.config`). No signer beyond the fee payer; anyone may call it once. The pool and config go through the same owner, discriminator, length, `pool.config` and kind checks as in `create_market`, so a market resolves the same way on either pool kind.
 
 Decision, with `now` from the clock sysvar:
 
@@ -122,12 +133,14 @@ These must hold on every account at every point. The tests check each one.
 5. `market.state` changes only in `resolve`, only from `Open`, and only when the decision function returns a side.
 6. A YES resolution implies the chain recorded curve completion at or before the deadline (by timestamp) or showed the curve complete while the clock was at or before the deadline.
 7. A NO resolution implies the clock was past the deadline and the pool showed no completion in time.
-8. Every account an instruction touches is a PDA of this program, the quote mint, a token account of that mint, or a DBC account that passed the owner and discriminator checks.
+8. Every account an instruction touches is a PDA of this program, the quote mint, a token account of that mint, or a DBC account that passed the owner and discriminator checks. A DBC pool and config read together are of the same kind (`VirtualPool` with `PoolConfig`, `TransferHookPool` with `ConfigWithTransferHook`).
 9. No lamports or tokens leave the program except through `claim`, and only to the account the position owner names.
 
 ## Threat model
 
-**Foreign account reads.** The pool and config are not this program's accounts, so an attacker could pass any account. The program requires the DBC program id as owner, the exact discriminator and the minimum length, and ties `config` to `pool.config` and `quote_mint` to `config.quote_mint`. After creation, `resolve` only accepts the exact `pool` and `config` keys stored in the market. An attacker cannot forge a DBC-owned account. A DBC program upgrade that changes the layout is the residual risk; the IDL-pinned tests catch it for a redeploy, and a market created against a pool whose layout changed under it would read garbage. The 180 day cap bounds that exposure.
+**Foreign account reads.** The pool and config are not this program's accounts, so an attacker could pass any account. The program requires the DBC program id as owner, one of the two pool discriminators (or one of the two config discriminators) and that kind's minimum length, ties `config` to `pool.config` and `quote_mint` to `config.quote_mint`, and requires the pool and config kinds to match. After creation, `resolve` only accepts the exact `pool` and `config` keys stored in the market. An attacker cannot forge a DBC-owned account. A DBC program upgrade that changes the layout is the residual risk; the IDL-pinned tests catch it for a redeploy, and a market created against a pool whose layout changed under it would read garbage. The 180 day cap bounds that exposure.
+
+**Two pool kinds.** Accepting `TransferHookPool` widens what a DBC-owned account may be, so the checks stay exact rather than loose: the discriminator must be one of the two pool discriminators (no other DBC account, such as a config, metadata or operator account, passes; `parse_rejects_every_other_dbc_account` walks every account type in the IDL), the length is checked per kind, and a pool and config of different kinds are refused with `PoolKindMismatch` even though the DBC never creates such a pair, so a config of one kind can never be read through a pool of the other. The fields read are the same `PoolState` and `PoolConfig` bytes in both kinds, pinned against the IDL for each. The base mint's transfer hook is irrelevant to the market: stakes and payouts move the quote mint only, and the hook runs only when the base token moves, inside the DBC. The pool kind is not stored in the `Market` (the account layout is unchanged); `resolve` reads it again from the discriminator, which the DBC never changes for an existing account.
 
 **Clock.** `Clock::get()` is validator time and can drift by a few seconds. Deadlines are compared with it in `create_market`, `stake` and `resolve`. The curve completion time comes from `finish_curve_timestamp`, which the DBC program wrote from the same clock, so YES versus NO at the boundary is consistent within the chain's own clock. Traders should treat the last minute before a deadline as uncertain.
 
@@ -149,12 +162,13 @@ These must hold on every account at every point. The tests check each one.
 
 ## Test map
 
-All tests live in `onchain/programs/curve_market/tests/` and run on the host over LiteSVM with crafted DBC accounts. The crafted accounts are built with the DBC program id as owner and the real discriminators.
+All tests live in `onchain/programs/curve_market/tests/` and run on the host over LiteSVM with crafted DBC accounts. The crafted accounts are built with the DBC program id as owner and the real discriminators. The lifecycle tests run once per pool kind through a `both_kinds!` macro: the plain name is the `VirtualPool` run, the `transfer_hook_` name the `TransferHookPool` one.
 
 | Area | Test | File |
 | --- | --- | --- |
-| IDL offsets | `virtual_pool_offsets_match_idl`, `pool_config_offsets_match_idl`, `account_lengths_match_idl`, `discriminators_match_idl`, `dbc_program_id_matches_idl` | `layout.rs` |
-| Parser against an IDL-built buffer | `parse_pool_reads_fields_laid_out_by_idl`, `parse_config_reads_fields_laid_out_by_idl`, `parse_rejects_bad_discriminator_and_short_buffers` | `layout.rs` |
+| IDL offsets | `virtual_pool_offsets_match_idl` (both pool kinds), `pool_config_offsets_match_idl` (also inside `ConfigWithTransferHook`), `account_lengths_match_idl`, `discriminators_match_idl`, `dbc_program_id_matches_idl` | `layout.rs` |
+| Parser against an IDL-built buffer | `parse_pool_reads_fields_laid_out_by_idl`, `parse_transfer_hook_pool_reads_fields_laid_out_by_idl`, `parse_config_reads_fields_laid_out_by_idl`, `parse_config_with_transfer_hook_reads_fields_laid_out_by_idl`, `parse_rejects_bad_discriminator_and_short_buffers`, `parse_transfer_hook_kinds_reject_bad_discriminator_and_short_buffers`, `parse_rejects_every_other_dbc_account` | `layout.rs` |
+| Parser against real accounts | `parse_real_transfer_hook_pool_snapshots` (two mainnet `TransferHookPool`s and their `ConfigWithTransferHook`s) | `layout.rs` |
 | Decision function | `decide_timestamp_is_authoritative`, `decide_migrated_without_timestamp_is_yes`, `decide_threshold_reached_only_counts_before_deadline`, `decide_waits_then_resolves_no` | `layout.rs` |
 | Payout math | `payout_even_sides_doubles`, `payout_uneven_sides_floors_and_never_exceeds_pool`, `payout_handles_u64_scale_without_overflow`, `payout_rejects_zero_winning_total_for_nonzero_stake` | `layout.rs` |
 | Create | `create_market_stores_fields`, `create_market_allows_several_deadlines_per_pool`, `create_rejects_pool_with_wrong_owner`, `create_rejects_pool_with_wrong_discriminator`, `create_rejects_short_pool_account`, `create_rejects_migrated_or_finished_pool`, `create_rejects_config_and_mint_mismatch`, `create_rejects_bad_deadlines`, `create_rejects_mint_owned_by_other_token_program` | `market.rs` |
@@ -162,23 +176,25 @@ All tests live in `onchain/programs/curve_market/tests/` and run on the host ove
 | Resolve | `resolve_not_yet_before_deadline`, `resolve_yes_via_is_migrated`, `resolve_yes_via_finish_curve_timestamp`, `resolve_yes_via_quote_reserve_at_threshold_before_deadline`, `resolve_no_after_deadline`, `resolve_no_when_curve_finished_after_deadline`, `resolve_rejects_foreign_pool_or_config` | `market.rs` |
 | Claim | `claim_even_sides_pays_winner_double_and_loser_nothing`, `claim_uneven_sides_is_pro_rata_and_never_overpays`, `claim_single_winner_takes_whole_pool`, `claim_refund_returns_both_sides`, `claim_pays_trader_holding_both_sides`, `claim_rejects_double_claim`, `claim_rejects_before_resolution_and_other_users_position` | `market.rs` |
 | Token-2022 | `token_2022_quote_mint_round_trip` | `market.rs` |
+| `TransferHookPool` mirror | the same body as the `VirtualPool` test, over a `TransferHookPool` under a `ConfigWithTransferHook`: `transfer_hook_create_market_stores_fields`, `transfer_hook_create_rejects_pool_with_wrong_owner`, `transfer_hook_create_rejects_pool_with_wrong_discriminator`, `transfer_hook_create_rejects_short_pool_account`, `transfer_hook_create_rejects_migrated_or_finished_pool`, `transfer_hook_create_rejects_config_and_mint_mismatch`, `transfer_hook_stake_both_sides_moves_tokens_and_updates_totals`, `transfer_hook_resolve_not_yet_before_deadline`, `transfer_hook_resolve_yes_via_is_migrated`, `transfer_hook_resolve_yes_via_finish_curve_timestamp`, `transfer_hook_resolve_yes_via_quote_reserve_at_threshold_before_deadline`, `transfer_hook_resolve_no_after_deadline`, `transfer_hook_resolve_no_when_curve_finished_after_deadline`, `transfer_hook_resolve_rejects_foreign_pool_or_config`, `transfer_hook_claim_even_sides_pays_winner_double_and_loser_nothing`, `transfer_hook_claim_refund_returns_both_sides`, `transfer_hook_token_2022_quote_mint_round_trip` | `market.rs` |
+| Pool kinds | `create_rejects_pool_and_config_of_different_kinds`, `create_rejects_short_config_with_transfer_hook`, `resolve_rejects_pool_rewritten_to_other_kind`, `markets_on_both_kinds_settle_independently`, `real_transfer_hook_pool_snapshot_opens_and_resolves` (real mainnet bytes: opens on a trading pool, resolves NO after the deadline, refuses a migrated one) | `market.rs` |
 
 Run them with:
 
 ```
 cd onchain
 anchor build          # or: cargo build-sbf
-cargo test            # 45 tests, about two seconds once compiled
+cargo test            # 72 tests, about four seconds once compiled
 CURVE_CU=1 cargo test --test market -- --nocapture   # also prints compute units
 ```
 
-Compute units per instruction on the `z` build: create about 33k, stake about 38k to 41k, resolve about 9k, claim about 21k to 31k.
+Compute units per instruction on the `z` build: create about 33k to 36k, stake about 38k to 44k, resolve about 9k, claim about 21k to 31k, the same for both pool kinds within a few dozen units (the spread is the PDA bump search).
 
 ## Deploy
 
 ```
 cd onchain
-anchor build
+anchor build                           # add --ignore-keys when target/deploy holds no program keypair
 anchor keys list                       # must print DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp
 solana config set -u devnet
 solana program deploy target/deploy/curve_market.so \
@@ -188,11 +204,22 @@ solana program show DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp -u devnet
 
 `--use-rpc` matters on the public devnet endpoint; TPU writes from this machine time out. If a deploy dies part way, the write buffer keeps its rent: `solana program show --buffers` lists it and `solana program deploy ... --buffer <address>` resumes from it (the wallet is the buffer authority). `solana program close --buffers` reclaims one you no longer need.
 
-The program keypair lives in `onchain/target/deploy/curve_market-keypair.json` and is not committed. It is only needed for the first deploy; upgrades use the wallet as upgrade authority.
+The program keypair lives in `onchain/target/deploy/curve_market-keypair.json` and is not committed. It is only needed for the first deploy; upgrades use the wallet as upgrade authority. A fresh `target/` gets a new random keypair, which is why `anchor build` then needs `--ignore-keys`; do not run `anchor keys sync`, which would rewrite the program id.
+
+### Upgrade for transfer-hook pools
+
+The devnet program (`DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp`, last deployed in slot 506,600,855, 264,064 bytes of program data, authority `FHj8w7MuuqMBeEKdFT2BXEEx9Xj6dZ18Z9cLiBmPr513`) predates `TransferHookPool` support, so on devnet `create_market` and `resolve` still refuse a `TransferHookPool` with error 6001. The `Market` and `Position` layouts and the instruction set are unchanged, so existing markets keep working after an upgrade and the web client needs no change beyond the error messages it already has. The new build is 265,480 bytes, 1,416 more than the deployed one, so the program data account has to grow. solana-cli 3.1 extends it automatically on deploy; the explicit form is:
+
+```
+solana program extend DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp 1416 -u devnet   # optional, deploy does it
+solana program deploy target/deploy/curve_market.so --program-id DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp -u devnet --use-rpc
+```
+
+Measured with `solana rent` on devnet on 3 October 2026: the extend costs 0.0072 SOL of rent, kept by the program. The deploy writes the new binary to a buffer first, which needs about 1.349 SOL of rent while it exists; that comes back to the wallet when the upgrade consumes the buffer, so the lasting cost is the extend plus about 0.002 SOL of fees for about 260 write transactions. The authority wallet held 0.217 SOL on that date, so it needs about 1.15 devnet SOL more (a faucet airdrop) before the upgrade can run.
 
 ## Mainnet rent estimate
 
-From the built binary (264,064 bytes) and `solana rent` on mainnet:
+From the built binary (264,064 bytes before transfer-hook pools; 265,480 now adds about 0.0072 SOL) and `solana rent` on mainnet:
 
 | Account | Bytes | Rent |
 | --- | --- | --- |
@@ -203,7 +230,7 @@ From the built binary (264,064 bytes) and `solana rent` on mainnet:
 
 Per market, paid by the creator: `Market` 0.0019 SOL plus vault 0.0015 SOL, about 0.0034 SOL. Per position, paid by the trader and returned on claim: 0.0011 SOL.
 
-Upgrading in place is free as long as the new binary is not larger than 264,064 bytes; a larger one needs `solana program extend` at 0.0000051 SOL per extra byte.
+Upgrading in place is free as long as the new binary is not larger than the program data account; a larger one needs `solana program extend` at 0.0000051 SOL per extra byte, as the transfer-hook build does on devnet (above).
 
 ## Roadmap to mainnet
 
