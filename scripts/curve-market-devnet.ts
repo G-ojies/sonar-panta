@@ -2,7 +2,7 @@
  * Drive the curve_market program on devnet from a keypair file, with the same builders the pool page uses:
  *
  *   npx tsx scripts/curve-market-devnet.ts markets [pool]                    list markets (and a wallet's positions)
- *   npx tsx scripts/curve-market-devnet.ts create <pool> <seconds-ahead>     open a market on a DBC VirtualPool
+ *   npx tsx scripts/curve-market-devnet.ts create <pool> <seconds-ahead>     open a market on a DBC pool (either kind)
  *   npx tsx scripts/curve-market-devnet.ts stake <market> yes|no <amount>    stake, amount in the quote token (SOL)
  *   npx tsx scripts/curve-market-devnet.ts resolve <market>
  *   npx tsx scripts/curve-market-devnet.ts claim <market>
@@ -17,7 +17,7 @@ import { Connection, Keypair, PublicKey, SystemProgram, TransactionMessage, Vers
 import {
   DEVNET_RPC, associatedTokenAddress, claimPlan, createMarketIx, fetchMarket, fetchMarkets, fetchPositions, friendlyProgramError, positionPayout, stakePlan, type RpcCall,
 } from '../src/lib/curve-market';
-import { decodePoolConfig, decodeVirtualPool } from '../src/lib/dbc';
+import { decodeConfig, decodePool } from '../src/lib/dbc';
 
 const RPC = process.env.RPC ?? DEVNET_RPC;
 const conn = new Connection(RPC, 'confirmed');
@@ -66,13 +66,13 @@ async function main() {
     const pool = a[0]; const ahead = Number(a[1] ?? 3600);
     const info = await conn.getAccountInfo(new PublicKey(pool));
     if (!info) throw new Error('pool account missing');
-    const state = decodeVirtualPool(info.data);
+    const state = decodePool(info.data);
     const cfgInfo = await conn.getAccountInfo(new PublicKey(state.config));
-    const cfg = decodePoolConfig(cfgInfo!.data);
+    const cfg = decodeConfig(cfgInfo!.data);
     const mintInfo = await conn.getAccountInfo(new PublicKey(cfg.quote_mint));
     const deadline = Math.floor(Date.now() / 1000) + ahead;
     const { ix, market, vault } = createMarketIx(signer.publicKey, { pool, config: state.config, quoteMint: cfg.quote_mint, tokenProgram: mintInfo!.owner.toBase58() }, deadline);
-    console.log(`creating market ${market.toBase58()} vault ${vault.toBase58()} deadline ${deadline} (${new Date(deadline * 1000).toISOString()}) quote ${cfg.quote_mint}`);
+    console.log(`creating market ${market.toBase58()} vault ${vault.toBase58()} deadline ${deadline} (${new Date(deadline * 1000).toISOString()}) quote ${cfg.quote_mint} pool kind ${state.kind}`);
     console.log('signature', await send([ix]));
   } else if (cmd === 'stake') {
     const m = await fetchMarket(call, a[0]); if (!m) throw new Error('no such market');

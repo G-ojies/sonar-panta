@@ -16,7 +16,7 @@ function print(side: 'buy' | 'sell', quoteSol: number, at: number, extra: Partia
 
 function pool(address: string, over: Partial<CurvePool> = {}): CurvePool {
   return {
-    address, config: 'CFG', creator: 'C', baseMint: 'M', quote: { mint: 'So11111111111111111111111111111111111111112', symbol: 'SOL', decimals: 9 }, baseDecimals: 6,
+    address, kind: 'virtual', config: 'CFG', creator: 'C', baseMint: 'M', quote: { mint: 'So11111111111111111111111111111111111111112', symbol: 'SOL', decimals: 9 }, baseDecimals: 6,
     createdAt: null, createdFrom: null, firstSeenAt: T0, lastSeenAt: T0, foundBy: 'swap', status: 'trading', price: 1e-7, sqrtPrice: '1', quoteRaised: 10, quoteReserveRaw: '10000000000',
     threshold: 85, thresholdRaw: '85000000000', progressPct: 11.76, finishCurveAt: null, prints: 0, buys: 0, sells: 0, buyQuote: 0, largest: [], tape: [], updatedAt: T0, ...over,
   };

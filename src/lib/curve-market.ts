@@ -53,13 +53,14 @@ export const SIDE_INDEX: Record<Side, number> = { yes: 0, no: 1 };
 
 /** Error codes from the IDL, for friendly messages. */
 export const ERRORS: Record<number, string> = {
-  6000: 'The pool account is not owned by the DBC program', 6001: 'The pool account is not a VirtualPool', 6002: 'The pool account is too short',
-  6003: 'The config account is not owned by the DBC program', 6004: 'The config account is not a PoolConfig', 6005: 'The config account is too short',
+  6000: 'The pool account is not owned by the DBC program', 6001: 'The pool account is not a DBC pool this program accepts (VirtualPool or TransferHookPool)', 6002: 'The pool account is too short',
+  6003: 'The config account is not owned by the DBC program', 6004: 'The config account is not a PoolConfig or ConfigWithTransferHook', 6005: 'The config account is too short',
   6006: 'The config does not match the pool', 6007: 'The quote mint does not match the config', 6008: 'The quote mint is not owned by the token program given',
   6009: 'The pool has already graduated or filled its curve', 6010: 'The deadline is not in the future', 6011: 'The deadline is more than 180 days away',
   6012: 'The market is no longer open', 6013: 'The deadline has passed, so the market takes no new stakes', 6014: 'The stake is below the minimum',
   6015: 'The pool has not graduated and the deadline has not passed yet', 6016: 'The market has not been resolved', 6017: 'The position belongs to a different market',
   6018: 'The position has already been claimed', 6019: 'Arithmetic overflow', 6020: 'The vault does not match the market', 6021: 'The pool does not match the market',
+  6022: 'The pool and its config are different DBC kinds',
 };
 
 // ---- small Borsh helpers ----

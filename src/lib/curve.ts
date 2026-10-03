@@ -9,12 +9,12 @@
  *
  * So the index is sampled and bounded, and says so:
  *   1. Discovery. Each refresh reads the newest CURVE_SCAN_SIGNATURES signatures of the program (one call) and fetches
- *      the first CURVE_SCAN_TXS successful ones. A creation (EvtInitializePool) enters the index with its creator
- *      and time. A swap (EvtSwap2) enters its pool too, because a curve that is trading now is what a graduation
- *      market is about, and the print joins that pool's tape.
- *   2. Following. Every indexed pool's VirtualPool account is read in one getMultipleAccounts sweep per refresh
- *      (424 bytes each), which gives price, quote held, progress and status for all of them. A pool's config is
- *      immutable, so it is read once and cached for a month.
+ *      the first CURVE_SCAN_TXS successful ones. A creation (EvtInitializePool, or its transfer-hook twin) enters
+ *      the index with its creator and time. A swap (EvtSwap2, or EvtSwap2WithTransferHook) enters its pool too,
+ *      because a curve that is trading now is what a graduation market is about, and the print joins that pool's tape.
+ *   2. Following. Every indexed pool's account (a VirtualPool or a TransferHookPool, 424 bytes either way) is read in
+ *      one getMultipleAccounts sweep per refresh, which gives price, quote held, progress and status for all of them.
+ *      A pool's config (PoolConfig or ConfigWithTransferHook) is immutable, so it is read once and cached for a month.
  *   3. Tapes. A pool's own signature list is only its own transactions, so a tape is cheap per pool: a few pools a
  *      refresh (the ones nearest graduation and the ones someone opened), bounded in signatures and transactions,
  *      plus an on-demand fill when a pool page is opened, inside a budget per ten minutes.
@@ -28,8 +28,8 @@
  */
 import { rpc } from './chain-tape';
 import {
-  DBC_PROGRAM, QUOTE_MINTS, curveStatus, decodePoolConfig, decodeVirtualPool, eventsFromTx, fromRaw, priceFromSqrt, printsFromTx, progressPct,
-  type CurvePrint, type CurveStatus, type DbcTx, type EvtInitializePool, type PoolConfigState, type VirtualPoolState,
+  DBC_PROGRAM, QUOTE_MINTS, curveStatus, decodeConfig, decodePool, eventsFromTx, fromRaw, priceFromSqrt, printsFromTx, progressPct,
+  type CurvePrint, type CurveStatus, type DbcPoolState, type DbcTx, type EvtInitializePool, type PoolConfigState, type PoolKind, type VirtualPoolState,
 } from './dbc';
 import { store } from './store';
 
@@ -78,6 +78,8 @@ export interface QuoteInfo { mint: string; symbol: string; decimals: number }
 /** What the index keeps per pool: the account as last read, plus what the tape and the sample added. */
 export interface CurvePool {
   address: string;
+  /** The pool account's type: a VirtualPool, or a TransferHookPool (Token-2022 base mint with a transfer hook). Rows stored before this field existed read as virtual. */
+  kind: PoolKind;
   config: string;
   creator: string;
   baseMint: string;
@@ -176,7 +178,8 @@ async function loadConfigs(addresses: string[]): Promise<Map<string, PoolConfigS
       const v = res.value[j];
       if (!v) continue;
       try {
-        const c = decodePoolConfig(Buffer.from(v.data[0], 'base64'));
+        if (v.owner !== DBC_PROGRAM) continue;
+        const c = decodeConfig(Buffer.from(v.data[0], 'base64'));
         const s = summarizeConfig(c, await quoteInfo(c.quote_mint));
         configMemo.set(chunk[j], s); out.set(chunk[j], s);
         await store().set(K.config(chunk[j]), s, 30 * 86400);
@@ -256,15 +259,15 @@ async function sampleProgram(max: number, errors: string[]): Promise<{ rows: Sig
   return { rows, txs };
 }
 
-/** Read every pool's account in chunks; null for an address that is not a VirtualPool any more (closed) or never was. */
-async function readPools(addresses: string[]): Promise<Map<string, VirtualPoolState | null>> {
-  const out = new Map<string, VirtualPoolState | null>();
+/** Read every pool's account in chunks; null for an address that is not a DBC pool (either kind) any more (closed) or never was. */
+async function readPools(addresses: string[]): Promise<Map<string, DbcPoolState | null>> {
+  const out = new Map<string, DbcPoolState | null>();
   for (let i = 0; i < addresses.length; i += 100) {
     const chunk = addresses.slice(i, i + 100);
     const res = await rpc<{ value: (AccountInfo | null)[] }>('getMultipleAccounts', [chunk, { encoding: 'base64' }]);
     chunk.forEach((a, j) => {
       const v = res.value[j];
-      try { out.set(a, v && v.owner === DBC_PROGRAM ? decodeVirtualPool(Buffer.from(v.data[0], 'base64')) : null); } catch { out.set(a, null); }
+      try { out.set(a, v && v.owner === DBC_PROGRAM ? decodePool(Buffer.from(v.data[0], 'base64')) : null); } catch { out.set(a, null); }
     });
   }
   return out;
@@ -316,9 +319,9 @@ export async function refreshCurve(): Promise<CurveIndex> {
   const addresses = [...new Set([...Object.keys(pools), ...seenNow, ...pinned])];
 
   // 2. the sweep
-  let states = new Map<string, VirtualPoolState | null>();
+  let states = new Map<string, DbcPoolState | null>();
   try { states = await readPools(addresses); } catch (e) { errors.push(`accounts: ${(e as Error).message}`); }
-  const configs = await loadConfigs([...states.values()].filter((v): v is VirtualPoolState => !!v).map((v) => v.config)).catch((e) => { errors.push(`configs: ${(e as Error).message}`); return new Map<string, PoolConfigSummary>(); });
+  const configs = await loadConfigs([...states.values()].filter((v): v is DbcPoolState => !!v).map((v) => v.config)).catch((e) => { errors.push(`configs: ${(e as Error).message}`); return new Map<string, PoolConfigSummary>(); });
   for (const a of addresses) {
     const state = states.get(a);
     if (state === undefined) continue; // the sweep failed: the row stands as it was
@@ -329,7 +332,7 @@ export async function refreshCurve(): Promise<CurveIndex> {
     const c = created.get(a);
     const activation = activationTime(state, cfg, rows[0]?.slot ?? null, now);
     const row: CurvePool = {
-      address: a, config: state.config, creator: state.creator, baseMint: state.base_mint, quote: cfg.quote, baseDecimals: cfg.baseDecimals,
+      address: a, kind: state.kind, config: state.config, creator: state.creator, baseMint: state.base_mint, quote: cfg.quote, baseDecimals: cfg.baseDecimals,
       createdAt: c?.blockTime ?? old?.createdAt ?? activation?.at ?? null, createdFrom: c ? 'event' : old?.createdFrom ?? activation?.from ?? null,
       firstSeenAt: old?.firstSeenAt ?? now, lastSeenAt: seenNow.has(a) ? now : old?.lastSeenAt ?? now,
       foundBy: old?.foundBy ?? (c ? 'creation' : sampled.has(a) ? 'swap' : 'request'),
@@ -446,7 +449,7 @@ export async function readPool(address: string): Promise<{ pool: CurvePool; tape
     if (!cfg) return null;
     const activation = activationTime(state, cfg, idx?.slot ?? null, idx?.updatedAt ?? now);
     pool = {
-      address, config: state.config, creator: state.creator, baseMint: state.base_mint, quote: cfg.quote, baseDecimals: cfg.baseDecimals,
+      address, kind: state.kind, config: state.config, creator: state.creator, baseMint: state.base_mint, quote: cfg.quote, baseDecimals: cfg.baseDecimals,
       createdAt: activation?.at ?? null, createdFrom: activation?.from ?? null, firstSeenAt: now, lastSeenAt: now, foundBy: 'request',
       ...poolFields(state, cfg, now), prints: 0, buys: 0, sells: 0, buyQuote: 0, largest: [], tape: [],
     };
