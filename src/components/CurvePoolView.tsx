@@ -82,6 +82,7 @@ export function CurvePoolView({ address }: { address: string }) {
               <Row k="threshold" v={`${p.thresholdRaw} raw`} />
               <Row k="sqrt price" v={p.sqrtPrice} />
               <Row k="base decimals" v={String(p.baseDecimals)} />
+              <Row k="account" v={p.kind === 'transferHook' ? 'TransferHookPool' : 'VirtualPool'} />
               <Row k="config" v={<a href={account(p.config)} target="_blank" rel="noopener noreferrer">{short(p.config)}</a>} />
               <Row k="found by" v={p.foundBy === 'creation' ? 'its creation' : p.foundBy === 'swap' ? 'a swap in a sample' : 'a request'} />
             </dl>

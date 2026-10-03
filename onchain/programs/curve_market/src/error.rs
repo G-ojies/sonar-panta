@@ -4,15 +4,15 @@ use anchor_lang::prelude::*;
 pub enum CurveError {
     #[msg("The pool account is not owned by the DBC program")]
     PoolNotOwnedByDbc,
-    #[msg("The pool account does not start with the VirtualPool discriminator")]
+    #[msg("The pool account is not a VirtualPool or TransferHookPool")]
     PoolDiscriminator,
-    #[msg("The pool account is shorter than the VirtualPool layout")]
+    #[msg("The pool account is shorter than the DBC pool layout")]
     PoolLayout,
     #[msg("The config account is not owned by the DBC program")]
     ConfigNotOwnedByDbc,
-    #[msg("The config account does not start with the PoolConfig discriminator")]
+    #[msg("The config account is not a PoolConfig or ConfigWithTransferHook")]
     ConfigDiscriminator,
-    #[msg("The config account is shorter than the PoolConfig layout")]
+    #[msg("The config account is shorter than the DBC config layout")]
     ConfigLayout,
     #[msg("The config account does not match the pool's config field")]
     ConfigMismatch,
@@ -46,4 +46,6 @@ pub enum CurveError {
     VaultMismatch,
     #[msg("The pool does not match the market")]
     PoolMismatch,
+    #[msg("The pool and config are different DBC kinds")]
+    PoolKindMismatch,
 }

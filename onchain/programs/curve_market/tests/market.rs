@@ -1,11 +1,15 @@
 //! End-to-end tests over LiteSVM with crafted DBC accounts. No network.
+//!
+//! The lifecycle tests run once per DBC pool kind: the plain name is the
+//! `VirtualPool` run and the `transfer_hook_` name is the same body over a
+//! `TransferHookPool` under a `ConfigWithTransferHook`.
 
 mod common;
 
 use {
     anchor_lang::{InstructionData, ToAccountMetas},
     common::*,
-    curve_market::{CurveError, Market, MarketState, Position, Side, MIN_STAKE},
+    curve_market::{dbc::PoolKind, CurveError, Market, MarketState, Position, Side, MIN_STAKE},
     solana_keypair::Keypair,
     solana_pubkey::Pubkey,
     solana_signer::Signer,
@@ -19,6 +23,7 @@ const SOL: u64 = 1_000_000_000;
 struct Fx {
     svm: litesvm::LiteSVM,
     pid: Pubkey,
+    kind: PoolKind,
     token_program: Pubkey,
     mint: Pubkey,
     pool: Pubkey,
@@ -31,22 +36,39 @@ struct Fx {
 
 impl Fx {
     fn new(token_program: Pubkey) -> Self {
+        Self::with_kind(token_program, PoolKind::Virtual)
+    }
+
+    /// A pool and config of `kind` (a `VirtualPool` under a `PoolConfig`, or a
+    /// `TransferHookPool` under a `ConfigWithTransferHook`).
+    fn with_kind(token_program: Pubkey, kind: PoolKind) -> Self {
         let (mut svm, pid) = load_program();
         set_time(&mut svm, NOW);
         let mint = set_mint(&mut svm, token_program);
         let pool = Pubkey::new_unique();
         let config = Pubkey::new_unique();
-        set_config(&mut svm, config, mint, THRESHOLD);
-        set_pool(&mut svm, pool, &PoolSpec::open(config));
+        set_config_kind(&mut svm, config, kind, mint, THRESHOLD);
+        set_pool(&mut svm, pool, &PoolSpec::open_kind(config, kind));
         let creator = fund(&mut svm);
         let deadline = NOW + DAY;
         let market = market_pda(&pid, &pool, deadline);
         let vault = vault_pda(&pid, &market);
-        Fx { svm, pid, token_program, mint, pool, config, creator, deadline, market, vault }
+        Fx { svm, pid, kind, token_program, mint, pool, config, creator, deadline, market, vault }
     }
 
+    /// An open pool of this fixture's kind pointing at its config.
+    fn spec(&self) -> PoolSpec {
+        PoolSpec::open_kind(self.config, self.kind)
+    }
+
+    /// Rewrite the pool account. The kind is always the fixture's own.
     fn set_pool(&mut self, spec: PoolSpec) {
-        set_pool(&mut self.svm, self.pool, &spec);
+        set_pool(&mut self.svm, self.pool, &PoolSpec { kind: self.kind, ..spec });
+    }
+
+    /// Config bytes of this fixture's kind for `mint`.
+    fn config_bytes(&self, mint: Pubkey) -> Vec<u8> {
+        config_bytes_kind(self.kind, mint, THRESHOLD)
     }
 
     fn time(&mut self, t: i64) {
@@ -184,13 +206,27 @@ fn position_pda(pid: &Pubkey, market: &Pubkey, user: &Pubkey) -> Pubkey {
     .0
 }
 
+/// One test body, two `#[test]`s: the `VirtualPool` run and the
+/// `TransferHookPool` run.
+macro_rules! both_kinds {
+    ($case:ident => $virtual:ident, $hook:ident) => {
+        #[test]
+        fn $virtual() {
+            $case(PoolKind::Virtual)
+        }
+        #[test]
+        fn $hook() {
+            $case(PoolKind::TransferHook)
+        }
+    };
+}
+
 // ---------------------------------------------------------------------------
 // create_market
 // ---------------------------------------------------------------------------
 
-#[test]
-fn create_market_stores_fields() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn create_market_stores_fields_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().expect("create");
     let m = fx.market();
     assert_eq!(m.pool, fx.pool);
@@ -206,6 +242,7 @@ fn create_market_stores_fields() {
     assert_eq!(m.state, MarketState::Open);
     assert_eq!(fx.balance(&fx.vault), 0);
 }
+both_kinds!(create_market_stores_fields_case => create_market_stores_fields, transfer_hook_create_market_stores_fields);
 
 #[test]
 fn create_market_allows_several_deadlines_per_pool() {
@@ -217,63 +254,65 @@ fn create_market_allows_several_deadlines_per_pool() {
     assert!(fx.create().is_err());
 }
 
-#[test]
-fn create_rejects_pool_with_wrong_owner() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
-    let bytes = pool_bytes(&PoolSpec::open(fx.config));
+fn create_rejects_pool_with_wrong_owner_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
+    let bytes = pool_bytes(&fx.spec());
     set_account(&mut fx.svm, fx.pool, Pubkey::new_unique(), bytes);
     assert_err(fx.create(), CurveError::PoolNotOwnedByDbc);
 }
+both_kinds!(create_rejects_pool_with_wrong_owner_case => create_rejects_pool_with_wrong_owner, transfer_hook_create_rejects_pool_with_wrong_owner);
 
-#[test]
-fn create_rejects_pool_with_wrong_discriminator() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
-    let mut bytes = pool_bytes(&PoolSpec::open(fx.config));
-    bytes[..8].copy_from_slice(&curve_market::dbc::POOL_CONFIG_DISCRIMINATOR);
+fn create_rejects_pool_with_wrong_discriminator_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
+    let mut bytes = pool_bytes(&fx.spec());
+    // The config discriminator of the same kind: a DBC account, but not a pool.
+    bytes[..8].copy_from_slice(&config_layout(kind).0);
     set_account(&mut fx.svm, fx.pool, curve_market::dbc::DBC_PROGRAM_ID, bytes);
     assert_err(fx.create(), CurveError::PoolDiscriminator);
 }
+both_kinds!(create_rejects_pool_with_wrong_discriminator_case => create_rejects_pool_with_wrong_discriminator, transfer_hook_create_rejects_pool_with_wrong_discriminator);
 
-#[test]
-fn create_rejects_short_pool_account() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
-    let bytes = pool_bytes(&PoolSpec::open(fx.config))[..300].to_vec();
+fn create_rejects_short_pool_account_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
+    let bytes = pool_bytes(&fx.spec())[..300].to_vec();
     set_account(&mut fx.svm, fx.pool, curve_market::dbc::DBC_PROGRAM_ID, bytes);
     assert_err(fx.create(), CurveError::PoolLayout);
 }
+both_kinds!(create_rejects_short_pool_account_case => create_rejects_short_pool_account, transfer_hook_create_rejects_short_pool_account);
 
-#[test]
-fn create_rejects_migrated_or_finished_pool() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+fn create_rejects_migrated_or_finished_pool_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     assert_err(fx.create(), CurveError::PoolAlreadyComplete);
 
-    fx.set_pool(PoolSpec { finish_curve_timestamp: NOW as u64 - 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { finish_curve_timestamp: NOW as u64 - 1, ..fx.spec() });
     assert_err(fx.create(), CurveError::PoolAlreadyComplete);
 
-    fx.set_pool(PoolSpec { quote_reserve: THRESHOLD, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { quote_reserve: THRESHOLD, ..fx.spec() });
     assert_err(fx.create(), CurveError::PoolAlreadyComplete);
 }
+both_kinds!(create_rejects_migrated_or_finished_pool_case => create_rejects_migrated_or_finished_pool, transfer_hook_create_rejects_migrated_or_finished_pool);
 
-#[test]
-fn create_rejects_config_and_mint_mismatch() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn create_rejects_config_and_mint_mismatch_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     // A config the pool does not point at.
     let other_config = Pubkey::new_unique();
-    set_config(&mut fx.svm, other_config, fx.mint, THRESHOLD);
+    set_config_kind(&mut fx.svm, other_config, kind, fx.mint, THRESHOLD);
     let (deadline, pool, mint) = (fx.deadline, fx.pool, fx.mint);
     assert_err(fx.create_with(deadline, pool, other_config, mint), CurveError::ConfigMismatch);
 
     // A config owned by someone else.
-    set_account(&mut fx.svm, fx.config, Pubkey::new_unique(), config_bytes(fx.mint, THRESHOLD));
+    let bytes = fx.config_bytes(fx.mint);
+    set_account(&mut fx.svm, fx.config, Pubkey::new_unique(), bytes);
     assert_err(fx.create(), CurveError::ConfigNotOwnedByDbc);
-    set_config(&mut fx.svm, fx.config, fx.mint, THRESHOLD);
+    set_config_kind(&mut fx.svm, fx.config, kind, fx.mint, THRESHOLD);
 
     // A mint that is not the config's quote mint.
     let other_mint = set_mint(&mut fx.svm, TOKEN_PROGRAM);
     let config = fx.config;
     assert_err(fx.create_with(deadline, pool, config, other_mint), CurveError::QuoteMintMismatch);
 }
+both_kinds!(create_rejects_config_and_mint_mismatch_case => create_rejects_config_and_mint_mismatch, transfer_hook_create_rejects_config_and_mint_mismatch);
 
 #[test]
 fn create_rejects_bad_deadlines() {
@@ -290,9 +329,8 @@ fn create_rejects_bad_deadlines() {
 // stake
 // ---------------------------------------------------------------------------
 
-#[test]
-fn stake_both_sides_moves_tokens_and_updates_totals() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn stake_both_sides_moves_tokens_and_updates_totals_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     let (a, a_tok) = fx.trader(10 * SOL);
     let (b, b_tok) = fx.trader(10 * SOL);
@@ -316,6 +354,7 @@ fn stake_both_sides_moves_tokens_and_updates_totals() {
     let pb = fx.position(&b.pubkey()).unwrap();
     assert_eq!((pb.yes_amount, pb.no_amount), (0, 3 * SOL));
 }
+both_kinds!(stake_both_sides_moves_tokens_and_updates_totals_case => stake_both_sides_moves_tokens_and_updates_totals, transfer_hook_stake_both_sides_moves_tokens_and_updates_totals);
 
 #[test]
 fn stake_rejects_dust_and_insufficient_balance() {
@@ -366,9 +405,8 @@ fn two_sided(fx: &mut Fx) -> ((Keypair, Pubkey), (Keypair, Pubkey)) {
     (a, b)
 }
 
-#[test]
-fn resolve_not_yet_before_deadline() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn resolve_not_yet_before_deadline_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     two_sided(&mut fx);
     assert_err(fx.resolve(), CurveError::NotYet);
@@ -376,13 +414,13 @@ fn resolve_not_yet_before_deadline() {
     assert_err(fx.resolve(), CurveError::NotYet);
     assert_eq!(fx.market().state, MarketState::Open);
 }
+both_kinds!(resolve_not_yet_before_deadline_case => resolve_not_yet_before_deadline, transfer_hook_resolve_not_yet_before_deadline);
 
-#[test]
-fn resolve_yes_via_is_migrated() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn resolve_yes_via_is_migrated_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     two_sided(&mut fx);
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     fx.resolve().expect("resolve");
     let m = fx.market();
     assert_eq!(m.state, MarketState::ResolvedYes);
@@ -390,35 +428,35 @@ fn resolve_yes_via_is_migrated() {
     // Second resolve is rejected.
     assert_err(fx.resolve(), CurveError::MarketNotOpen);
 }
+both_kinds!(resolve_yes_via_is_migrated_case => resolve_yes_via_is_migrated, transfer_hook_resolve_yes_via_is_migrated);
 
-#[test]
-fn resolve_yes_via_finish_curve_timestamp() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn resolve_yes_via_finish_curve_timestamp_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     two_sided(&mut fx);
     fx.set_pool(PoolSpec {
         finish_curve_timestamp: (fx.deadline - 60) as u64,
-        ..PoolSpec::open(fx.config)
+        ..fx.spec()
     });
     // Resolving long after the deadline still gives YES: the timestamp decides.
     fx.time(fx.deadline + 30 * DAY);
     fx.resolve().expect("resolve");
     assert_eq!(fx.market().state, MarketState::ResolvedYes);
 }
+both_kinds!(resolve_yes_via_finish_curve_timestamp_case => resolve_yes_via_finish_curve_timestamp, transfer_hook_resolve_yes_via_finish_curve_timestamp);
 
-#[test]
-fn resolve_yes_via_quote_reserve_at_threshold_before_deadline() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn resolve_yes_via_quote_reserve_at_threshold_before_deadline_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     two_sided(&mut fx);
-    fx.set_pool(PoolSpec { quote_reserve: THRESHOLD, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { quote_reserve: THRESHOLD, ..fx.spec() });
     fx.resolve().expect("resolve");
     assert_eq!(fx.market().state, MarketState::ResolvedYes);
 }
+both_kinds!(resolve_yes_via_quote_reserve_at_threshold_before_deadline_case => resolve_yes_via_quote_reserve_at_threshold_before_deadline, transfer_hook_resolve_yes_via_quote_reserve_at_threshold_before_deadline);
 
-#[test]
-fn resolve_no_after_deadline() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn resolve_no_after_deadline_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     two_sided(&mut fx);
     fx.time(fx.deadline + 1);
@@ -427,49 +465,50 @@ fn resolve_no_after_deadline() {
     assert_eq!(m.state, MarketState::ResolvedNo);
     assert_eq!(m.resolved_at, fx.deadline + 1);
 }
+both_kinds!(resolve_no_after_deadline_case => resolve_no_after_deadline, transfer_hook_resolve_no_after_deadline);
 
-#[test]
-fn resolve_no_when_curve_finished_after_deadline() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn resolve_no_when_curve_finished_after_deadline_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     two_sided(&mut fx);
     fx.set_pool(PoolSpec {
         is_migrated: 1,
         finish_curve_timestamp: (fx.deadline + 1) as u64,
-        ..PoolSpec::open(fx.config)
+        ..fx.spec()
     });
     fx.time(fx.deadline + DAY);
     fx.resolve().expect("resolve");
     assert_eq!(fx.market().state, MarketState::ResolvedNo);
 }
+both_kinds!(resolve_no_when_curve_finished_after_deadline_case => resolve_no_when_curve_finished_after_deadline, transfer_hook_resolve_no_when_curve_finished_after_deadline);
 
-#[test]
-fn resolve_rejects_foreign_pool_or_config() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn resolve_rejects_foreign_pool_or_config_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     two_sided(&mut fx);
     // A different pool account, even a valid migrated one, is rejected.
     let other_pool = Pubkey::new_unique();
-    set_pool(&mut fx.svm, other_pool, &PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    let spec = PoolSpec { is_migrated: 1, ..fx.spec() };
+    set_pool(&mut fx.svm, other_pool, &spec);
     let real = fx.pool;
     fx.pool = other_pool;
     assert_err(fx.resolve(), CurveError::PoolMismatch);
     fx.pool = real;
     // The pool rewritten to point at another config is rejected.
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(Pubkey::new_unique()) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open_kind(Pubkey::new_unique(), kind) });
     assert_err(fx.resolve(), CurveError::ConfigMismatch);
 }
+both_kinds!(resolve_rejects_foreign_pool_or_config_case => resolve_rejects_foreign_pool_or_config, transfer_hook_resolve_rejects_foreign_pool_or_config);
 
 // ---------------------------------------------------------------------------
 // claim
 // ---------------------------------------------------------------------------
 
-#[test]
-fn claim_even_sides_pays_winner_double_and_loser_nothing() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn claim_even_sides_pays_winner_double_and_loser_nothing_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     let ((a, a_tok), (b, b_tok)) = two_sided(&mut fx);
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     fx.resolve().unwrap();
 
     let a_lamports_before = fx.svm.get_balance(&a.pubkey()).unwrap();
@@ -486,6 +525,7 @@ fn claim_even_sides_pays_winner_double_and_loser_nothing() {
     assert_eq!(m.paid_out, 2 * SOL);
     assert_eq!(fx.balance(&fx.vault), 0);
 }
+both_kinds!(claim_even_sides_pays_winner_double_and_loser_nothing_case => claim_even_sides_pays_winner_double_and_loser_nothing, transfer_hook_claim_even_sides_pays_winner_double_and_loser_nothing);
 
 #[test]
 fn claim_uneven_sides_is_pro_rata_and_never_overpays() {
@@ -498,7 +538,7 @@ fn claim_uneven_sides_is_pro_rata_and_never_overpays() {
     fx.stake(&a, a_tok, Side::Yes, SOL).unwrap();
     fx.stake(&c, c_tok, Side::Yes, 2 * SOL).unwrap();
     fx.stake(&b, b_tok, Side::No, SOL).unwrap();
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     fx.resolve().unwrap();
 
     fx.claim(&a, a_tok).unwrap();
@@ -533,16 +573,15 @@ fn claim_single_winner_takes_whole_pool() {
     assert_eq!(fx.balance(&fx.vault), 0);
 }
 
-#[test]
-fn claim_refund_returns_both_sides() {
-    let mut fx = Fx::new(TOKEN_PROGRAM);
+fn claim_refund_returns_both_sides_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
     fx.create().unwrap();
     let (a, a_tok) = fx.trader(10 * SOL);
     let (b, b_tok) = fx.trader(10 * SOL);
     fx.stake(&a, a_tok, Side::Yes, SOL).unwrap();
     fx.stake(&b, b_tok, Side::Yes, 2 * SOL).unwrap();
     // Nobody took NO, so YES winning would have nothing to win.
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     fx.resolve().unwrap();
     assert_eq!(fx.market().state, MarketState::Refund);
 
@@ -552,6 +591,7 @@ fn claim_refund_returns_both_sides() {
     assert_eq!(fx.balance(&b_tok), 10 * SOL);
     assert_eq!(fx.balance(&fx.vault), 0);
 }
+both_kinds!(claim_refund_returns_both_sides_case => claim_refund_returns_both_sides, transfer_hook_claim_refund_returns_both_sides);
 
 #[test]
 fn claim_pays_trader_holding_both_sides() {
@@ -574,7 +614,7 @@ fn claim_rejects_double_claim() {
     let mut fx = Fx::new(TOKEN_PROGRAM);
     fx.create().unwrap();
     let ((a, a_tok), _) = two_sided(&mut fx);
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     fx.resolve().unwrap();
     fx.claim(&a, a_tok).unwrap();
     assert!(fx.claim(&a, a_tok).is_err(), "position is gone");
@@ -587,7 +627,7 @@ fn claim_rejects_before_resolution_and_other_users_position() {
     fx.create().unwrap();
     let ((a, a_tok), (b, b_tok)) = two_sided(&mut fx);
     assert_err(fx.claim(&a, a_tok), CurveError::NotResolved);
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     fx.resolve().unwrap();
     // b signing for a's position: the PDA is derived from the signer, so the
     // account passed does not match and Anchor rejects it.
@@ -617,7 +657,7 @@ fn stake_rejects_after_resolve() {
     let mut fx = Fx::new(TOKEN_PROGRAM);
     fx.create().unwrap();
     let ((a, a_tok), _) = two_sided(&mut fx);
-    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
     fx.resolve().unwrap();
     // Still before the deadline, but the market is closed.
     assert_err(fx.stake(&a, a_tok, Side::Yes, SOL), CurveError::MarketNotOpen);
@@ -627,9 +667,8 @@ fn stake_rejects_after_resolve() {
 // Token-2022
 // ---------------------------------------------------------------------------
 
-#[test]
-fn token_2022_quote_mint_round_trip() {
-    let mut fx = Fx::new(TOKEN_2022_PROGRAM);
+fn token_2022_quote_mint_round_trip_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_2022_PROGRAM, kind);
     fx.create().expect("create with token-2022 mint");
     assert_eq!(fx.market().token_program, TOKEN_2022_PROGRAM);
     let ((a, a_tok), (b, b_tok)) = two_sided(&mut fx);
@@ -641,6 +680,7 @@ fn token_2022_quote_mint_round_trip() {
     assert_eq!(fx.balance(&b_tok), 11 * SOL);
     assert_eq!(fx.balance(&a_tok), 9 * SOL);
 }
+both_kinds!(token_2022_quote_mint_round_trip_case => token_2022_quote_mint_round_trip, transfer_hook_token_2022_quote_mint_round_trip);
 
 #[test]
 fn create_rejects_mint_owned_by_other_token_program() {
@@ -651,4 +691,118 @@ fn create_rejects_mint_owned_by_other_token_program() {
     set_config(&mut fx.svm, fx.config, mint, THRESHOLD);
     let (deadline, pool, config) = (fx.deadline, fx.pool, fx.config);
     assert!(fx.create_with(deadline, pool, config, mint).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Pool kinds
+// ---------------------------------------------------------------------------
+
+#[test]
+fn create_rejects_pool_and_config_of_different_kinds() {
+    // A VirtualPool naming a ConfigWithTransferHook.
+    let mut fx = Fx::new(TOKEN_PROGRAM);
+    set_config_kind(&mut fx.svm, fx.config, PoolKind::TransferHook, fx.mint, THRESHOLD);
+    assert_err(fx.create(), CurveError::PoolKindMismatch);
+
+    // A TransferHookPool naming a PoolConfig.
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, PoolKind::TransferHook);
+    set_config_kind(&mut fx.svm, fx.config, PoolKind::Virtual, fx.mint, THRESHOLD);
+    assert_err(fx.create(), CurveError::PoolKindMismatch);
+}
+
+#[test]
+fn create_rejects_short_config_with_transfer_hook() {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, PoolKind::TransferHook);
+    // The hook discriminator on a buffer only as long as a PoolConfig.
+    let bytes = fx.config_bytes(fx.mint)[..curve_market::dbc::POOL_CONFIG_LEN].to_vec();
+    set_account(&mut fx.svm, fx.config, curve_market::dbc::DBC_PROGRAM_ID, bytes);
+    assert_err(fx.create(), CurveError::ConfigLayout);
+}
+
+#[test]
+fn resolve_rejects_pool_rewritten_to_other_kind() {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, PoolKind::TransferHook);
+    fx.create().unwrap();
+    two_sided(&mut fx);
+    // The DBC never changes an account's kind, but if the stored pool key ever
+    // held a VirtualPool under this ConfigWithTransferHook it is refused.
+    let spec = PoolSpec { kind: PoolKind::Virtual, is_migrated: 1, ..fx.spec() };
+    set_pool(&mut fx.svm, fx.pool, &spec);
+    assert_err(fx.resolve(), CurveError::PoolKindMismatch);
+    assert_eq!(fx.market().state, MarketState::Open);
+}
+
+#[test]
+fn markets_on_both_kinds_settle_independently() {
+    // One program, one market per kind, opposite outcomes.
+    let mut hook = Fx::with_kind(TOKEN_PROGRAM, PoolKind::TransferHook);
+    hook.create().unwrap();
+    let ((a, a_tok), (b, b_tok)) = two_sided(&mut hook);
+
+    // A VirtualPool and its config in the same SVM.
+    let v_pool = Pubkey::new_unique();
+    let v_config = Pubkey::new_unique();
+    set_config_kind(&mut hook.svm, v_config, PoolKind::Virtual, hook.mint, THRESHOLD);
+    set_pool(&mut hook.svm, v_pool, &PoolSpec::open(v_config));
+    let deadline = hook.deadline;
+    let mint = hook.mint;
+    hook.create_with(deadline, v_pool, v_config, mint).expect("virtual market beside the hook one");
+
+    hook.set_pool(PoolSpec { finish_curve_timestamp: (deadline - 1) as u64, ..hook.spec() });
+    hook.resolve().unwrap();
+    assert_eq!(hook.market().state, MarketState::ResolvedYes);
+    hook.claim(&a, a_tok).unwrap();
+    hook.claim(&b, b_tok).unwrap();
+    assert_eq!(hook.balance(&a_tok), 11 * SOL);
+    assert_eq!(hook.balance(&b_tok), 9 * SOL);
+
+    let v_market = market_pda(&hook.pid, &v_pool, deadline);
+    let m: Market = read(&hook.svm, &v_market);
+    assert_eq!((m.pool, m.config, m.state), (v_pool, v_config, MarketState::Open));
+}
+
+/// The program over real mainnet bytes: a market opens on a trading
+/// TransferHookPool under its ConfigWithTransferHook, takes stakes, waits,
+/// then resolves NO after the deadline; a migrated one is refused.
+#[test]
+fn real_transfer_hook_pool_snapshot_opens_and_resolves() {
+    let real = real_transfer_hook_pools();
+    let (trading, migrated) = (&real[0], &real[1]);
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, PoolKind::TransferHook);
+    let dbc_id = curve_market::dbc::DBC_PROGRAM_ID;
+    for r in &real {
+        set_account(&mut fx.svm, r.pool, dbc_id, r.pool_data.clone());
+        set_account(&mut fx.svm, r.config, dbc_id, r.config_data.clone());
+    }
+    // The quote mints the real configs name: wrapped SOL, and USDC.
+    let wsol: Pubkey = "So11111111111111111111111111111111111111112".parse().unwrap();
+    let usdc: Pubkey = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".parse().unwrap();
+    set_account(&mut fx.svm, wsol, TOKEN_PROGRAM, mint_bytes(9));
+    set_account(&mut fx.svm, usdc, TOKEN_PROGRAM, mint_bytes(6));
+
+    let deadline = fx.deadline;
+    assert_err(
+        fx.create_with(deadline, migrated.pool, migrated.config, usdc),
+        CurveError::PoolAlreadyComplete,
+    );
+
+    fx.pool = trading.pool;
+    fx.config = trading.config;
+    fx.mint = wsol;
+    fx.market = market_pda(&fx.pid, &fx.pool, deadline);
+    fx.vault = vault_pda(&fx.pid, &fx.market);
+    fx.create().expect("create on the real pool");
+    let m = fx.market();
+    assert_eq!((m.pool, m.config, m.quote_mint), (trading.pool, trading.config, wsol));
+    assert_eq!(m.migration_quote_threshold, 6_469_811_299_045);
+
+    two_sided(&mut fx);
+    assert_eq!(fx.balance(&fx.vault), 2 * SOL);
+    assert_err(fx.resolve(), CurveError::NotYet);
+    fx.time(deadline + 1);
+    fx.resolve().expect("resolve");
+    assert_eq!(fx.market().state, MarketState::ResolvedNo);
+    // Claims are covered by the crafted-account tests; the real quote mint
+    // here is the native mint, whose wrapped accounts LiteSVM's raw token
+    // fixtures do not model.
 }

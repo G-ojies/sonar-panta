@@ -165,12 +165,16 @@ export type CurveMarket = {
           "signer": true
         },
         {
-          "name": "pool"
+          "name": "pool",
+          "docs": [
+            "A DBC `VirtualPool` or `TransferHookPool`."
+          ]
         },
         {
           "name": "config",
           "docs": [
-            "and the key must equal `pool.config`."
+            "A DBC `PoolConfig` or `ConfigWithTransferHook`, of the same kind as the",
+            "pool; the key must equal `pool.config`."
           ]
         },
         {
@@ -534,12 +538,12 @@ export type CurveMarket = {
     {
       "code": 6001,
       "name": "poolDiscriminator",
-      "msg": "The pool account does not start with the VirtualPool discriminator"
+      "msg": "The pool account is not a VirtualPool or TransferHookPool"
     },
     {
       "code": 6002,
       "name": "poolLayout",
-      "msg": "The pool account is shorter than the VirtualPool layout"
+      "msg": "The pool account is shorter than the DBC pool layout"
     },
     {
       "code": 6003,
@@ -549,12 +553,12 @@ export type CurveMarket = {
     {
       "code": 6004,
       "name": "configDiscriminator",
-      "msg": "The config account does not start with the PoolConfig discriminator"
+      "msg": "The config account is not a PoolConfig or ConfigWithTransferHook"
     },
     {
       "code": 6005,
       "name": "configLayout",
-      "msg": "The config account is shorter than the PoolConfig layout"
+      "msg": "The config account is shorter than the DBC config layout"
     },
     {
       "code": 6006,
@@ -635,6 +639,11 @@ export type CurveMarket = {
       "code": 6021,
       "name": "poolMismatch",
       "msg": "The pool does not match the market"
+    },
+    {
+      "code": 6022,
+      "name": "poolKindMismatch",
+      "msg": "The pool and config are different DBC kinds"
     }
   ],
   "types": [
@@ -682,14 +691,14 @@ export type CurveMarket = {
           {
             "name": "pool",
             "docs": [
-              "The DBC `VirtualPool` the market is about."
+              "The DBC pool the market is about (`VirtualPool` or `TransferHookPool`)."
             ],
             "type": "pubkey"
           },
           {
             "name": "config",
             "docs": [
-              "The DBC `PoolConfig` the pool points at."
+              "The DBC config the pool points at (`PoolConfig` or `ConfigWithTransferHook`)."
             ],
             "type": "pubkey"
           },

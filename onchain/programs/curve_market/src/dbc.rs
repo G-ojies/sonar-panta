@@ -4,7 +4,15 @@
 //! the discriminator and the length, then reads a handful of fields at fixed
 //! byte offsets. The offsets are derived from the official IDL
 //! (`onchain/dbc-idl.json`, program version 0.2.1) and are pinned by the unit
-//! tests in `tests/layout.rs`, which rebuild both accounts from the IDL types.
+//! tests in `tests/layout.rs`, which rebuild the accounts from the IDL types.
+//!
+//! A DBC pool comes in two kinds. `VirtualPool` is the original one and is
+//! created under a `PoolConfig`. `TransferHookPool` (a Token-2022 base mint
+//! with a transfer hook) is created under a `ConfigWithTransferHook`. Both pool
+//! kinds wrap the same `PoolState` and are 424 bytes, so the pool offsets are
+//! shared; `ConfigWithTransferHook` starts with a whole `PoolConfig` and adds
+//! the hook program and padding after it, so the config offsets are shared
+//! too. Only the discriminators and the config length differ.
 
 use anchor_lang::prelude::*;
 
@@ -15,15 +23,37 @@ pub const DBC_PROGRAM_ID: Pubkey = pubkey!("dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4
 
 /// Anchor discriminator of the `VirtualPool` account.
 pub const VIRTUAL_POOL_DISCRIMINATOR: [u8; 8] = [213, 224, 5, 209, 98, 69, 119, 92];
+/// Anchor discriminator of the `TransferHookPool` account.
+pub const TRANSFER_HOOK_POOL_DISCRIMINATOR: [u8; 8] = [237, 219, 184, 23, 42, 189, 169, 35];
 /// Anchor discriminator of the `PoolConfig` account.
 pub const POOL_CONFIG_DISCRIMINATOR: [u8; 8] = [26, 108, 14, 123, 116, 230, 129, 43];
+/// Anchor discriminator of the `ConfigWithTransferHook` account.
+pub const CONFIG_WITH_TRANSFER_HOOK_DISCRIMINATOR: [u8; 8] = [40, 220, 194, 251, 41, 199, 123, 253];
 
 /// Full serialised length of a `VirtualPool` account, discriminator included.
 pub const VIRTUAL_POOL_LEN: usize = 424;
+/// Full serialised length of a `TransferHookPool` account, discriminator included.
+pub const TRANSFER_HOOK_POOL_LEN: usize = 424;
 /// Full serialised length of a `PoolConfig` account, discriminator included.
 pub const POOL_CONFIG_LEN: usize = 1048;
+/// Full serialised length of a `ConfigWithTransferHook` account, discriminator
+/// included: a `PoolConfig`, the hook program (32) and `[u64; 6]` of padding.
+pub const CONFIG_WITH_TRANSFER_HOOK_LEN: usize = 1128;
 
-/// Byte offsets inside `VirtualPool` (discriminator at 0..8, then `PoolState`).
+/// Which DBC account family a pool or config belongs to. A pool and its
+/// config are always of the same kind: the DBC creates a `TransferHookPool`
+/// only under a `ConfigWithTransferHook`, and a `VirtualPool` only under a
+/// `PoolConfig`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PoolKind {
+    /// `VirtualPool` under a `PoolConfig`.
+    Virtual,
+    /// `TransferHookPool` under a `ConfigWithTransferHook`.
+    TransferHook,
+}
+
+/// Byte offsets inside a pool account (discriminator at 0..8, then
+/// `PoolState`). The same for `VirtualPool` and `TransferHookPool`.
 pub mod pool_offsets {
     /// `volatility_tracker`: 64 bytes (u64, [u8; 8], u128, u128, u128).
     pub const VOLATILITY_TRACKER: usize = 8;
@@ -53,7 +83,9 @@ pub mod pool_offsets {
     pub const FINISH_CURVE_TIMESTAMP: usize = 344;
 }
 
-/// Byte offsets inside `PoolConfig` (discriminator at 0..8).
+/// Byte offsets inside a config account (discriminator at 0..8). The same for
+/// `PoolConfig` and `ConfigWithTransferHook`, whose first field is a whole
+/// `PoolConfig`.
 pub mod config_offsets {
     pub const QUOTE_MINT: usize = 8;
     pub const FEE_CLAIMER: usize = 40;
@@ -64,9 +96,10 @@ pub mod config_offsets {
     pub const MIGRATION_BASE_THRESHOLD: usize = 272;
 }
 
-/// The fields of a `VirtualPool` the market cares about.
+/// The fields of a DBC pool the market cares about.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PoolView {
+    pub kind: PoolKind,
     pub config: Pubkey,
     pub quote_reserve: u64,
     pub is_migrated: u8,
@@ -74,9 +107,10 @@ pub struct PoolView {
     pub finish_curve_timestamp: u64,
 }
 
-/// The fields of a `PoolConfig` the market cares about.
+/// The fields of a DBC config the market cares about.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ConfigView {
+    pub kind: PoolKind,
     pub quote_mint: Pubkey,
     pub migration_quote_threshold: u64,
 }
@@ -101,21 +135,28 @@ fn read_u8(data: &[u8], offset: usize) -> Result<u8> {
     data.get(offset).copied().ok_or_else(|| CurveError::PoolLayout.into())
 }
 
-/// Validate and read a `VirtualPool` account.
+/// Validate and read a DBC pool account of either kind.
 pub fn read_pool(info: &AccountInfo) -> Result<PoolView> {
     require_keys_eq!(*info.owner, DBC_PROGRAM_ID, CurveError::PoolNotOwnedByDbc);
     let data = info.try_borrow_data()?;
     parse_pool(&data)
 }
 
-/// Parse `VirtualPool` bytes. Separated from the account check for tests.
+/// Parse pool bytes (`VirtualPool` or `TransferHookPool`). Separated from the
+/// account check for tests. The discriminator picks the kind; anything else,
+/// including a config or any other DBC account, is refused.
 pub fn parse_pool(data: &[u8]) -> Result<PoolView> {
-    require!(data.len() >= VIRTUAL_POOL_LEN, CurveError::PoolLayout);
-    require!(
-        data[..8] == VIRTUAL_POOL_DISCRIMINATOR,
-        CurveError::PoolDiscriminator
-    );
+    require!(data.len() >= 8, CurveError::PoolLayout);
+    let (kind, min_len) = if data[..8] == VIRTUAL_POOL_DISCRIMINATOR {
+        (PoolKind::Virtual, VIRTUAL_POOL_LEN)
+    } else if data[..8] == TRANSFER_HOOK_POOL_DISCRIMINATOR {
+        (PoolKind::TransferHook, TRANSFER_HOOK_POOL_LEN)
+    } else {
+        return err!(CurveError::PoolDiscriminator);
+    };
+    require!(data.len() >= min_len, CurveError::PoolLayout);
     Ok(PoolView {
+        kind,
         config: read_pubkey(data, pool_offsets::CONFIG)?,
         quote_reserve: read_u64(data, pool_offsets::QUOTE_RESERVE)?,
         is_migrated: read_u8(data, pool_offsets::IS_MIGRATED)?,
@@ -124,24 +165,46 @@ pub fn parse_pool(data: &[u8]) -> Result<PoolView> {
     })
 }
 
-/// Validate and read a `PoolConfig` account.
+/// Validate and read a DBC config account of either kind.
 pub fn read_config(info: &AccountInfo) -> Result<ConfigView> {
     require_keys_eq!(*info.owner, DBC_PROGRAM_ID, CurveError::ConfigNotOwnedByDbc);
     let data = info.try_borrow_data()?;
     parse_config(&data)
 }
 
-/// Parse `PoolConfig` bytes. Separated from the account check for tests.
+/// Parse config bytes (`PoolConfig` or `ConfigWithTransferHook`). Separated
+/// from the account check for tests.
 pub fn parse_config(data: &[u8]) -> Result<ConfigView> {
-    require!(data.len() >= POOL_CONFIG_LEN, CurveError::ConfigLayout);
-    require!(
-        data[..8] == POOL_CONFIG_DISCRIMINATOR,
-        CurveError::ConfigDiscriminator
-    );
+    require!(data.len() >= 8, CurveError::ConfigLayout);
+    let (kind, min_len) = if data[..8] == POOL_CONFIG_DISCRIMINATOR {
+        (PoolKind::Virtual, POOL_CONFIG_LEN)
+    } else if data[..8] == CONFIG_WITH_TRANSFER_HOOK_DISCRIMINATOR {
+        (PoolKind::TransferHook, CONFIG_WITH_TRANSFER_HOOK_LEN)
+    } else {
+        return err!(CurveError::ConfigDiscriminator);
+    };
+    require!(data.len() >= min_len, CurveError::ConfigLayout);
     Ok(ConfigView {
+        kind,
         quote_mint: read_pubkey(data, config_offsets::QUOTE_MINT)?,
         migration_quote_threshold: read_u64(data, config_offsets::MIGRATION_QUOTE_THRESHOLD)?,
     })
+}
+
+/// Read a pool and its config and check they belong together: the config key
+/// is the one the pool names, and both are of the same kind.
+pub fn read_pool_and_config(
+    pool: &AccountInfo,
+    config: &AccountInfo,
+) -> Result<(PoolView, ConfigView)> {
+    let pool_view = read_pool(pool)?;
+    require_keys_eq!(pool_view.config, config.key(), CurveError::ConfigMismatch);
+    let config_view = read_config(config)?;
+    require!(
+        pool_view.kind == config_view.kind,
+        CurveError::PoolKindMismatch
+    );
+    Ok((pool_view, config_view))
 }
 
 impl PoolView {

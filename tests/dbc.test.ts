@@ -2,10 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import bs58 from 'bs58';
 import {
-  DBC_PROGRAM, EVENT_IX_TAG, POOL_CONFIG_SIZE, VIRTUAL_POOL_SIZE, accountDiscriminator, curveStatus, decodeEvent, decodePoolConfig,
-  decodeVirtualPool, eventsFromTx, offsetOf, priceFromSqrt, printsFromTx, progressPct, sizeOf, type DbcTx,
+  CONFIG_WITH_TRANSFER_HOOK_SIZE, DBC_PROGRAM, EVENT_ALIASES, EVENT_IX_TAG, POOL_CONFIG_SIZE, TRANSFER_HOOK_POOL_SIZE, VIRTUAL_POOL_SIZE,
+  accountDiscriminator, curveStatus, decodeConfig, decodeEvent, decodePool, decodePoolConfig, decodeTransferHookPool, decodeVirtualPool,
+  eventsFromTx, offsetOf, poolKind, priceFromSqrt, printsFromTx, progressPct, sizeOf, type DbcTx,
 } from '../src/lib/dbc';
 import idl from '../src/lib/dbc-idl.json';
+import realHookPools from '../onchain/programs/curve_market/tests/fixtures/transfer_hook_pools.json';
 
 // ---- a small Borsh writer, so fixtures are built from the IDL layouts rather than pasted bytes ----
 
@@ -24,9 +26,9 @@ const key = (s: string) => Buffer.from(bs58.decode(s));
 const disc = (name: string) => Buffer.from((idl.events as { name: string; discriminator: number[] }[]).find((e) => e.name === name)!.discriminator);
 
 const SQRT = 1_234_567_890_123_456_789_012n; // some Q64.64 sqrt price
-const initEvent = () => Buffer.concat([disc('EvtInitializePool'), key(POOL), key(CONFIG), key(CREATOR), key(MINT), u8(0), u64(123_456)]);
-const swap2Event = (dir: number, quoteReserve = 40_000_000_000n) => Buffer.concat([
-  disc('EvtSwap2'), key(POOL), key(CONFIG), u8(dir), u8(0),
+const initEvent = (name = 'EvtInitializePool') => Buffer.concat([disc(name), key(POOL), key(CONFIG), key(CREATOR), key(MINT), u8(0), u64(123_456)]);
+const swap2Event = (dir: number, quoteReserve = 40_000_000_000n, name = 'EvtSwap2') => Buffer.concat([
+  disc(name), key(POOL), key(CONFIG), u8(dir), u8(0),
   u64(1_000_000_000n), u64(0), u8(0), // swap_parameters: amount_0, amount_1, swap_mode
   u64(1_000_000_000n), u64(990_000_000n), u64(0), u64(5_000_000_000_000n), u128(SQRT), u64(10_000_000n), u64(2_000_000n), u64(0), // swap_result
   u64(quoteReserve), u64(85_000_000_000n), u64(1_790_000_000n),
@@ -37,7 +39,7 @@ const swapEvent = (dir: number) => Buffer.concat([
   u64(500_000_000n), u64(2_000_000_000_000n), u128(SQRT), u64(5_000_000n), u64(1_000_000n), u64(0), // swap_result
   u64(500_000_000n), u64(1_790_000_000n),
 ]);
-const completeEvent = () => Buffer.concat([disc('EvtCurveComplete'), key(POOL), key(CONFIG), u64(200_000_000_000_000n), u64(85_000_000_000n)]);
+const completeEvent = (name = 'EvtCurveComplete') => Buffer.concat([disc(name), key(POOL), key(CONFIG), u64(200_000_000_000_000n), u64(85_000_000_000n)]);
 
 /** A transaction whose DBC inner instructions carry the given events, the way emit_cpi writes them. */
 function txWith(events: Buffer[], opts: { err?: unknown; logs?: string[]; otherProgram?: boolean } = {}): DbcTx {
@@ -69,7 +71,7 @@ test('decodeEvent: EvtSwap2 nested structs and u128 sqrt price', () => {
 });
 
 test('decodeEvent: EvtCurveComplete, and unknown or short bytes are null', () => {
-  assert.deepEqual(decodeEvent(completeEvent()), { name: 'EvtCurveComplete', data: { pool: POOL, config: CONFIG, base_reserve: 200_000_000_000_000n, quote_reserve: 85_000_000_000n } });
+  assert.deepEqual(decodeEvent(completeEvent()), { name: 'EvtCurveComplete', idlName: 'EvtCurveComplete', data: { pool: POOL, config: CONFIG, base_reserve: 200_000_000_000_000n, quote_reserve: 85_000_000_000n } });
   assert.equal(decodeEvent(Buffer.alloc(8, 1)), null);
   assert.equal(decodeEvent(Buffer.alloc(3)), null);
   assert.equal(decodeEvent(initEvent().subarray(0, 60)), null); // truncated body
@@ -118,16 +120,59 @@ test('printsFromTx: a legacy swap without a swap2 becomes a print with no reserv
   assert.equal(prints[0].quoteReserveAfter, '');
 });
 
+// ---- the transfer-hook pool's events ----
+
+type IdlTypes = { name: string; type: { fields?: unknown[] } }[];
+const idlType = (name: string) => (idl.types as unknown as IdlTypes).find((t) => t.name === name)!.type;
+
+test('EVENT_ALIASES: each transfer-hook event has the same body as the plain one it is read as', () => {
+  assert.deepEqual(Object.keys(EVENT_ALIASES).sort(), ['EvtCurveCompleteWithTransferHook', 'EvtInitializePoolWithTransferHook', 'EvtSwap2WithTransferHook']);
+  for (const [hook, plain] of Object.entries(EVENT_ALIASES)) {
+    assert.deepEqual(idlType(hook), idlType(plain), `${hook} mirrors ${plain}`);
+    assert.notDeepEqual(disc(hook), disc(plain));
+  }
+  // every event in the IDL whose name mentions the hook is covered
+  const hookEvents = (idl.events as { name: string }[]).map((e) => e.name).filter((n) => n.endsWith('WithTransferHook') && !n.startsWith('EvtCreateConfig'));
+  assert.deepEqual(hookEvents.sort(), Object.keys(EVENT_ALIASES).sort());
+});
+
+test('decodeEvent: transfer-hook events come back under the plain name, with the IDL name kept', () => {
+  const swap = decodeEvent(swap2Event(1, 40_000_000_000n, 'EvtSwap2WithTransferHook'));
+  assert.equal(swap?.name, 'EvtSwap2');
+  assert.equal(swap?.idlName, 'EvtSwap2WithTransferHook');
+  assert.deepEqual(swap?.data, decodeEvent(swap2Event(1))?.data);
+  const init = decodeEvent(initEvent('EvtInitializePoolWithTransferHook'));
+  assert.deepEqual(init, { name: 'EvtInitializePool', idlName: 'EvtInitializePoolWithTransferHook', data: decodeEvent(initEvent())!.data });
+  const done = decodeEvent(completeEvent('EvtCurveCompleteWithTransferHook'));
+  assert.equal(done?.name, 'EvtCurveComplete');
+  assert.equal(done?.idlName, 'EvtCurveCompleteWithTransferHook');
+});
+
+test('printsFromTx: a swap2_with_transfer_hook is a print like any swap2', () => {
+  const tx = txWith([swap2Event(0, 41_000_000_000n, 'EvtSwap2WithTransferHook'), completeEvent('EvtCurveCompleteWithTransferHook')]);
+  assert.deepEqual(eventsFromTx(tx).map((e) => e.idlName), ['EvtSwap2WithTransferHook', 'EvtCurveCompleteWithTransferHook']);
+  const prints = printsFromTx('HOOK', tx);
+  assert.equal(prints.length, 1);
+  assert.equal(prints[0].side, 'sell');
+  assert.equal(prints[0].quoteRaw, '5000000000000');
+  assert.equal(prints[0].quoteReserveAfter, '41000000000');
+  assert.equal(prints[0].migrationThreshold, '85000000000');
+  // a legacy EvtSwap beside a hook swap2 is the duplicate, as with a plain swap2
+  assert.equal(printsFromTx('HOOK', txWith([swapEvent(1), swap2Event(1, 1n, 'EvtSwap2WithTransferHook')])).length, 1);
+});
+
 // ---- accounts ----
 
 /** The IDL says what the account sizes must be; the live accounts were checked against these numbers (see docs/CURVE.md). */
 test('account sizes computed from the IDL match the constants', () => {
   assert.equal(8 + sizeOf({ defined: { name: 'VirtualPool' } }), VIRTUAL_POOL_SIZE);
   assert.equal(8 + sizeOf({ defined: { name: 'PoolConfig' } }), POOL_CONFIG_SIZE);
+  assert.equal(8 + sizeOf({ defined: { name: 'TransferHookPool' } }), TRANSFER_HOOK_POOL_SIZE);
+  assert.equal(8 + sizeOf({ defined: { name: 'ConfigWithTransferHook' } }), CONFIG_WITH_TRANSFER_HOOK_SIZE);
 });
 
-/** A VirtualPool account built field by field from the IDL order. */
-function virtualPool(over: { quoteReserve?: bigint; sqrtPrice?: bigint; isMigrated?: number; finished?: bigint } = {}): Buffer {
+/** A pool account (VirtualPool by default, or TransferHookPool) built field by field from the IDL order. */
+function virtualPool(over: { quoteReserve?: bigint; sqrtPrice?: bigint; isMigrated?: number; finished?: bigint; account?: 'VirtualPool' | 'TransferHookPool' } = {}): Buffer {
   const vt = Buffer.concat([u64(1), Buffer.alloc(8), u128(0n), u128(0n), u128(0n)]); // volatility_tracker
   const metrics = Buffer.concat([u64(1), u64(2), u64(3), u64(4)]);
   const body = Buffer.concat([
@@ -137,10 +182,11 @@ function virtualPool(over: { quoteReserve?: bigint; sqrtPrice?: bigint; isMigrat
     u8(0), u8(over.isMigrated ?? 0), u8(0), u8(0), u8(0), u8(0), u8(0), u8(0),
     metrics, u64(over.finished ?? 0n), u64(0), u64(0), u8(0), u8(0), u8(1), Buffer.alloc(5), u16(0), Buffer.alloc(6), u64(0), u64(0), Buffer.alloc(24),
   ]);
-  const data = Buffer.concat([accountDiscriminator('VirtualPool'), body]);
+  const data = Buffer.concat([accountDiscriminator(over.account ?? 'VirtualPool'), body]);
   assert.equal(data.length, VIRTUAL_POOL_SIZE);
   return data;
 }
+const hookPool = (over: Parameters<typeof virtualPool>[0] = {}) => virtualPool({ ...over, account: 'TransferHookPool' });
 
 test('decodeVirtualPool: reserves, sqrt price and flags read from the right offsets', () => {
   const p = decodeVirtualPool(virtualPool());
@@ -175,6 +221,84 @@ test('decodePoolConfig: quote mint, decimals and threshold', () => {
   assert.throws(() => decodePoolConfig(virtualPool()), /not a PoolConfig/);
 });
 
+test('decodePool: either pool kind, the same fields, the kind recorded; anything else refused', () => {
+  const v = decodePool(virtualPool());
+  const h = decodePool(hookPool());
+  assert.equal(v.kind, 'virtual');
+  assert.equal(h.kind, 'transferHook');
+  const { kind: _v, ...vFields } = v;
+  const { kind: _h, ...hFields } = h;
+  assert.deepEqual(hFields, vFields);
+  assert.deepEqual(decodeTransferHookPool(hookPool()), decodeVirtualPool(virtualPool()));
+  assert.equal(poolKind(virtualPool()), 'virtual');
+  assert.equal(poolKind(hookPool()), 'transferHook');
+  assert.equal(poolKind(Buffer.alloc(VIRTUAL_POOL_SIZE)), null);
+  assert.throws(() => decodeVirtualPool(hookPool()), /not a VirtualPool/);
+  assert.throws(() => decodeTransferHookPool(virtualPool()), /not a TransferHookPool/);
+  assert.throws(() => decodePool(Buffer.alloc(VIRTUAL_POOL_SIZE)), /not a VirtualPool or TransferHookPool/);
+  assert.throws(() => decodePool(hookPool().subarray(0, 300)), /expected 424/);
+  assert.throws(() => decodePool(configWithTransferHook()), /not a VirtualPool or TransferHookPool/);
+});
+
+/** A ConfigWithTransferHook: a PoolConfig body, then the hook program and [u64; 6] of padding. */
+const HOOK_PROGRAM = 'HooKe1VRa7Pw9ENhHnoTG6aVfLL9cBzxEfKa7hhDuDkE';
+function configWithTransferHook(): Buffer {
+  const cfg = Buffer.alloc(POOL_CONFIG_SIZE - 8);
+  key(SOL).copy(cfg, offsetOf('PoolConfig', 'quote_mint'));
+  cfg[offsetOf('PoolConfig', 'token_decimal')] = 9;
+  u64(11_510_000_000n).copy(cfg, offsetOf('PoolConfig', 'migration_quote_threshold'));
+  const data = Buffer.concat([accountDiscriminator('ConfigWithTransferHook'), cfg, key(HOOK_PROGRAM), Buffer.alloc(48, 0xee)]);
+  assert.equal(data.length, CONFIG_WITH_TRANSFER_HOOK_SIZE);
+  return data;
+}
+
+test('decodeConfig: a PoolConfig or a ConfigWithTransferHook, with the hook program for the latter', () => {
+  const h = decodeConfig(configWithTransferHook());
+  assert.equal(h.kind, 'transferHook');
+  assert.equal(h.transfer_hook_program, HOOK_PROGRAM);
+  assert.equal(h.quote_mint, SOL);
+  assert.equal(h.token_decimal, 9);
+  assert.equal(h.migration_quote_threshold, 11_510_000_000n);
+  assert.equal(h.curve.length, 20);
+
+  const body = Buffer.alloc(POOL_CONFIG_SIZE - 8);
+  key(SOL).copy(body, 0);
+  u64(85_000_000_000n).copy(body, offsetOf('PoolConfig', 'migration_quote_threshold'));
+  const v = decodeConfig(Buffer.concat([accountDiscriminator('PoolConfig'), body]));
+  assert.equal(v.kind, 'virtual');
+  assert.equal(v.transfer_hook_program, null);
+  assert.equal(v.migration_quote_threshold, 85_000_000_000n);
+
+  assert.throws(() => decodePoolConfig(configWithTransferHook()), /not a PoolConfig/);
+  assert.throws(() => decodeConfig(configWithTransferHook().subarray(0, POOL_CONFIG_SIZE)), /expected 1128/);
+  assert.throws(() => decodeConfig(hookPool()), /not a PoolConfig or ConfigWithTransferHook/);
+});
+
+test('decodePool / decodeConfig: real mainnet TransferHookPool snapshots read back the values the chain showed', () => {
+  assert.equal(realHookPools.owner, DBC_PROGRAM);
+  const [trading, migrated] = realHookPools.accounts.map((a) => ({
+    ...a, state: decodePool(Buffer.from(a.poolData, 'hex')), cfg: decodeConfig(Buffer.from(a.configData, 'hex')),
+  }));
+  for (const r of [trading, migrated]) {
+    assert.equal(r.state.kind, 'transferHook');
+    assert.equal(r.cfg.kind, 'transferHook');
+    assert.equal(r.state.config, r.config);
+    assert.ok(r.cfg.transfer_hook_program && r.cfg.transfer_hook_program !== '11111111111111111111111111111111');
+    // the price sits on the curve: between the config's start and migration sqrt prices
+    assert.ok(r.state.sqrt_price >= r.cfg.sqrt_start_price && r.state.sqrt_price <= r.cfg.migration_sqrt_price);
+  }
+  assert.equal(trading.cfg.quote_mint, SOL);
+  assert.equal(trading.cfg.token_decimal, 6);
+  assert.equal(trading.state.quote_reserve, 11_569_203_035n);
+  assert.equal(trading.cfg.migration_quote_threshold, 6_469_811_299_045n);
+  assert.equal(curveStatus(trading.state), 'trading');
+  assert.equal(progressPct(trading.state.quote_reserve, trading.cfg.migration_quote_threshold), 0.17);
+  assert.equal(migrated.cfg.quote_mint, 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+  assert.equal(migrated.state.finish_curve_timestamp, 1_790_520_753n);
+  assert.equal(curveStatus(migrated.state), 'migrated');
+  assert.equal(progressPct(migrated.state.quote_reserve, migrated.cfg.migration_quote_threshold), 100);
+});
+
 // ---- math ----
 
 test('priceFromSqrt: a sqrt price of exactly 2^64 is a raw price of 1, scaled by the decimals', () => {
@@ -205,8 +329,21 @@ test('offsetOf: the pool account offsets a program would read, in bytes after th
   assert.throws(() => offsetOf('PoolConfig', 'nothing'), /no field/);
 });
 
+test('offsetOf: a TransferHookPool and a ConfigWithTransferHook put the graduation fields where the plain accounts do', () => {
+  for (const f of ['config', 'quote_reserve', 'sqrt_price', 'is_migrated', 'finish_curve_timestamp']) {
+    assert.equal(offsetOf('TransferHookPool', `pool_state.${f}`), offsetOf('VirtualPool', `pool_state.${f}`), f);
+  }
+  for (const f of ['quote_mint', 'token_decimal', 'migration_quote_threshold']) {
+    assert.equal(offsetOf('ConfigWithTransferHook', `config.${f}`), offsetOf('PoolConfig', f), f);
+  }
+  assert.equal(offsetOf('ConfigWithTransferHook', 'transfer_hook_program'), POOL_CONFIG_SIZE - 8);
+});
+
 test('curveStatus: trading until the curve finishes, complete until migrated', () => {
   assert.equal(curveStatus(decodeVirtualPool(virtualPool())), 'trading');
   assert.equal(curveStatus(decodeVirtualPool(virtualPool({ finished: 1_790_000_100n }))), 'complete');
   assert.equal(curveStatus(decodeVirtualPool(virtualPool({ finished: 1_790_000_100n, isMigrated: 1 }))), 'migrated');
+  assert.equal(curveStatus(decodePool(hookPool())), 'trading');
+  assert.equal(curveStatus(decodePool(hookPool({ finished: 1_790_000_100n }))), 'complete');
+  assert.equal(curveStatus(decodePool(hookPool({ finished: 1_790_000_100n, isMigrated: 1 }))), 'migrated');
 });

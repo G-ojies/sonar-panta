@@ -130,9 +130,7 @@ pub mod curve_market {
         let max_deadline = now.checked_add(MAX_DEADLINE_SECS).ok_or(CurveError::Overflow)?;
         require!(deadline_ts <= max_deadline, CurveError::DeadlineTooFar);
 
-        let pool = dbc::read_pool(&ctx.accounts.pool)?;
-        require_keys_eq!(pool.config, ctx.accounts.config.key(), CurveError::ConfigMismatch);
-        let config = dbc::read_config(&ctx.accounts.config)?;
+        let (pool, config) = dbc::read_pool_and_config(&ctx.accounts.pool, &ctx.accounts.config)?;
         require_keys_eq!(
             config.quote_mint,
             ctx.accounts.quote_mint.key(),
@@ -258,9 +256,9 @@ pub mod curve_market {
         let market = &mut ctx.accounts.market;
         require!(market.is_open(), CurveError::MarketNotOpen);
 
-        let pool = dbc::read_pool(&ctx.accounts.pool)?;
-        require_keys_eq!(pool.config, market.config, CurveError::ConfigMismatch);
-        let config = dbc::read_config(&ctx.accounts.config)?;
+        // `has_one` already tied `pool` and `config` to the keys stored at
+        // creation; this re-checks the pool still names that config.
+        let (pool, config) = dbc::read_pool_and_config(&ctx.accounts.pool, &ctx.accounts.config)?;
 
         let winner = decide(&pool, config.migration_quote_threshold, market.deadline_ts, now)
             .ok_or(CurveError::NotYet)?;
@@ -365,11 +363,13 @@ pub struct CreateMarket<'info> {
     #[account(mut)]
     pub creator: Signer<'info>,
 
+    /// A DBC `VirtualPool` or `TransferHookPool`.
     /// CHECK: owner, discriminator and layout are verified in `dbc::read_pool`.
     pub pool: UncheckedAccount<'info>,
 
-    /// CHECK: owner, discriminator and layout are verified in `dbc::read_config`,
-    /// and the key must equal `pool.config`.
+    /// A DBC `PoolConfig` or `ConfigWithTransferHook`, of the same kind as the
+    /// pool; the key must equal `pool.config`.
+    /// CHECK: owner, discriminator and layout are verified in `dbc::read_config`.
     pub config: UncheckedAccount<'info>,
 
     #[account(

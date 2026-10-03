@@ -11,10 +11,17 @@
  * `meta.innerInstructions`, not from `Program data:` log lines (those are handled too, for a program built with
  * `emit!`). A `swap2` instruction emits both the legacy EvtSwap and EvtSwap2; only EvtSwap2 is turned into a print.
  *
- * Accounts. VirtualPool and PoolConfig are bytemuck (repr(C)) accounts. Their fields are laid out with explicit
+ * Two pool kinds. A launch is either a VirtualPool (created under a PoolConfig) or a TransferHookPool (a Token-2022
+ * base mint with a transfer hook, created under a ConfigWithTransferHook). Both pool accounts wrap the same PoolState
+ * and ConfigWithTransferHook starts with a whole PoolConfig, so one decoder reads both; only the discriminators and
+ * the config length differ. The transfer-hook instructions emit their own event types (EvtSwap2WithTransferHook,
+ * EvtInitializePoolWithTransferHook, EvtCurveCompleteWithTransferHook) with the same bodies as the plain ones, so
+ * `decodeEvent` reports them under the plain name and keeps the IDL name in `idlName`.
+ *
+ * Accounts. The pools and configs are bytemuck (repr(C)) accounts. Their fields are laid out with explicit
  * padding so that no implicit alignment padding exists, which is what lets the same sequential reader decode them;
- * the sizes computed from the IDL (VirtualPool 424 bytes, PoolConfig 1,048 bytes, both counting the discriminator)
- * are checked against live accounts in the tests and in `decodeVirtualPool` / `decodePoolConfig`.
+ * the sizes computed from the IDL (either pool 424 bytes, PoolConfig 1,048, ConfigWithTransferHook 1,128, all
+ * counting the discriminator) are checked against live accounts in the tests and in `decodePool` / `decodeConfig`.
  *
  * Price. `sqrt_price` is the square root of the price in Q64.64 fixed point, in raw units (quote lamports per base
  * lamport). So price_raw = (sqrt_price / 2^64)^2 and the display price, quote per whole base token, is
@@ -33,7 +40,16 @@ export const DBC_PROGRAM = 'dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN';
 /** Anchor's event instruction tag: the first 8 bytes of sha256("anchor:event"). */
 export const EVENT_IX_TAG = Buffer.from([228, 69, 165, 46, 81, 203, 154, 29]);
 export const VIRTUAL_POOL_SIZE = 424;
+export const TRANSFER_HOOK_POOL_SIZE = 424;
 export const POOL_CONFIG_SIZE = 1048;
+/** A PoolConfig, then the transfer hook program (32 bytes) and [u64; 6] of padding. */
+export const CONFIG_WITH_TRANSFER_HOOK_SIZE = 1128;
+
+/** Which DBC account family a pool belongs to: a VirtualPool under a PoolConfig, or a TransferHookPool under a ConfigWithTransferHook. */
+export type PoolKind = 'virtual' | 'transferHook';
+/** The IDL account names per kind. */
+export const POOL_ACCOUNT: Record<PoolKind, string> = { virtual: 'VirtualPool', transferHook: 'TransferHookPool' };
+export const CONFIG_ACCOUNT: Record<PoolKind, string> = { virtual: 'PoolConfig', transferHook: 'ConfigWithTransferHook' };
 
 /** Well-known quote mints and their decimals; anything else is read from the mint account. */
 export const QUOTE_MINTS: Record<string, { symbol: string; decimals: number }> = {
@@ -153,15 +169,26 @@ export interface EvtSwap {
 }
 export interface EvtCurveComplete { pool: string; config: string; base_reserve: bigint; quote_reserve: bigint }
 
-export interface DbcEvent { name: string; data: Decoded }
+/**
+ * The transfer-hook variants of the events, by the plain event they mirror. The bodies are identical (checked against
+ * the IDL in the tests), so a print or a creation reads the same whichever pool kind produced it.
+ */
+export const EVENT_ALIASES: Record<string, string> = {
+  EvtSwap2WithTransferHook: 'EvtSwap2',
+  EvtInitializePoolWithTransferHook: 'EvtInitializePool',
+  EvtCurveCompleteWithTransferHook: 'EvtCurveComplete',
+};
+
+/** `name` is the plain event name (a transfer-hook variant is reported as the event it mirrors); `idlName` is the IDL's own. */
+export interface DbcEvent { name: string; idlName: string; data: Decoded }
 
 /** The DBC event in `bytes` (event discriminator first, no instruction tag), or null when it is not one. */
 export function decodeEvent(bytes: Uint8Array): DbcEvent | null {
   if (bytes.length < 8) return null;
   const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const name = EVENTS.get([...buf.subarray(0, 8)].join(','));
-  if (!name) return null;
-  try { return { name, data: decodeType(name, buf, 8) }; } catch { return null; }
+  const idlName = EVENTS.get([...buf.subarray(0, 8)].join(','));
+  if (!idlName) return null;
+  try { return { name: EVENT_ALIASES[idlName] ?? idlName, idlName, data: decodeType(idlName, buf, 8) }; } catch { return null; }
 }
 
 /** A transaction as getTransaction returns it with encoding json, reduced to what the decoder reads. */
@@ -285,11 +312,32 @@ export interface PoolConfigState {
   [k: string]: unknown;
 }
 
+/** A pool's state with the kind of account it came from. */
+export type DbcPoolState = VirtualPoolState & { kind: PoolKind };
+/** A config with the kind of account it came from; `transfer_hook_program` is set for a ConfigWithTransferHook. */
+export type DbcConfigState = PoolConfigState & { kind: PoolKind; transfer_hook_program: string | null };
+
+const SIZES: Record<string, number> = {
+  VirtualPool: VIRTUAL_POOL_SIZE, TransferHookPool: TRANSFER_HOOK_POOL_SIZE,
+  PoolConfig: POOL_CONFIG_SIZE, ConfigWithTransferHook: CONFIG_WITH_TRANSFER_HOOK_SIZE,
+};
+
 function checkAccount(name: string, data: Buffer, size: number) {
   const disc = ACCOUNTS.get(name)!;
   if (data.length < 8 || !data.subarray(0, 8).equals(disc)) throw new Error(`dbc: not a ${name} account`);
   if (data.length < size) throw new Error(`dbc: ${name} account is ${data.length} bytes, expected ${size}`);
 }
+
+/** The kind whose account (POOL_ACCOUNT or CONFIG_ACCOUNT) carries the discriminator at the start of `data`, or null. */
+function kindOf(data: Buffer, names: Record<PoolKind, string>): PoolKind | null {
+  if (data.length < 8) return null;
+  const head = data.subarray(0, 8);
+  for (const kind of Object.keys(names) as PoolKind[]) if (head.equals(ACCOUNTS.get(names[kind])!)) return kind;
+  return null;
+}
+
+/** The kind of DBC pool `data` holds, by discriminator, or null when it is not a pool account. */
+export const poolKind = (data: Buffer): PoolKind | null => kindOf(data, POOL_ACCOUNT);
 
 /** The pool state inside a VirtualPool account (discriminator checked). */
 export function decodeVirtualPool(data: Buffer): VirtualPoolState {
@@ -297,9 +345,35 @@ export function decodeVirtualPool(data: Buffer): VirtualPoolState {
   return (decodeType('VirtualPool', data, 8) as { pool_state: VirtualPoolState }).pool_state;
 }
 
+/** The pool state inside a TransferHookPool account (discriminator checked). */
+export function decodeTransferHookPool(data: Buffer): VirtualPoolState {
+  checkAccount('TransferHookPool', data, TRANSFER_HOOK_POOL_SIZE);
+  return (decodeType('TransferHookPool', data, 8) as { pool_state: VirtualPoolState }).pool_state;
+}
+
+/** The pool state inside either pool account, with its kind. Throws for any other account. */
+export function decodePool(data: Buffer): DbcPoolState {
+  const kind = poolKind(data);
+  if (!kind) throw new Error('dbc: not a VirtualPool or TransferHookPool account');
+  const name = POOL_ACCOUNT[kind];
+  checkAccount(name, data, SIZES[name]);
+  return { ...(decodeType(name, data, 8) as { pool_state: VirtualPoolState }).pool_state, kind };
+}
+
 export function decodePoolConfig(data: Buffer): PoolConfigState {
   checkAccount('PoolConfig', data, POOL_CONFIG_SIZE);
   return decodeType('PoolConfig', data, 8) as unknown as PoolConfigState;
+}
+
+/** Either config account, with its kind. A ConfigWithTransferHook is its embedded PoolConfig plus the hook program. */
+export function decodeConfig(data: Buffer): DbcConfigState {
+  const kind = kindOf(data, CONFIG_ACCOUNT);
+  if (!kind) throw new Error('dbc: not a PoolConfig or ConfigWithTransferHook account');
+  const name = CONFIG_ACCOUNT[kind];
+  checkAccount(name, data, SIZES[name]);
+  if (kind === 'virtual') return { ...(decodeType(name, data, 8) as unknown as PoolConfigState), kind, transfer_hook_program: null };
+  const c = decodeType(name, data, 8) as unknown as { config: PoolConfigState; transfer_hook_program: string };
+  return { ...c.config, kind, transfer_hook_program: c.transfer_hook_program };
 }
 
 export const accountDiscriminator = (name: string) => ACCOUNTS.get(name)!;
