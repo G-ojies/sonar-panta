@@ -32,3 +32,22 @@ Zero spend: free tiers, and a sandbox switch runs the full trade, claim and crea
 
 (495 characters)
 
+
+
+# Update for the final Submit, drafted 3 October 2026
+
+Paste these two before pressing Submit on 6 October; the other fields stay as above. Re-read the replay record on /api/agent the same day and change the numbers if they moved.
+
+## Brief description (max 500)
+
+The intelligence layer for on-chain prediction markets. Sonar scores every Panta market on Solana from its own trade tape, decoded from the program log, prices it against Polymarket and Kalshi, and lets users trade, claim and create markets non-custodially. Sonar Curve adds a Meteora DBC launch index and an oracle-free Anchor program for markets on whether a launch graduates. A walk-forward replay over every resolved market is the public record. Open source, MIT.
+
+(467 characters)
+
+## Anything else judges should know (max 500)
+
+Zero spend: free tiers, and sandbox mode runs the full trade, claim and create flows on Panta test fixtures with an empty wallet. The record is a walk-forward replay over every resolved market (128 markets, 72 calls, 44 hits on 3 Oct), reported as-is. curve_market is on devnet with 45 tests and a threat model. 17 Panta API issues are documented. Also entered in the Panta, Superteam Nigeria, Solami, RPC Fast, Meteora, Adevar, CertiK and AkcaVPN side tracks. MIT.
+
+(465 characters)
+
+Technologies field: add "Anchor, LiteSVM, Meteora Dynamic Bonding Curve" if it fits under 500 (currently 488, so replace "cron-job.org and GitHub Actions schedulers" with "GitHub Actions" to make room).

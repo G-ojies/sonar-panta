@@ -95,7 +95,19 @@ Next: final submission on 6 October, the Superteam Nigeria pitch reviews and dem
 
 ## Week 4 (from 9 October, final)
 
-"Final update. Sonar for Panta is submitted. Numbers as of today: N markets tracked, N agent calls settled, hit rate N percent, N API issues filed. Everything is open source under MIT, deployed on free tiers, with zero spend. What I'd build next with support: live agent capital, secondary-market support the day Panta ships it, and the embeddable radar for creators. Thank you for reviewing."
+Post on the Builder updates feed on 9 October with two images: the Curve pool page with the markets panel, and the Agent page. Fill every [bracket] from the live site that morning; do not post a number that was not re-read that day.
+
+### Post text
+
+Sonar for Panta, week four, and the final update.
+
+The project is submitted. Where it stands today: the replay over every resolved Panta market has made [calls] calls on [markets] markets with [hits] right ([rate]%), walking each tape print by print with no look-ahead. [N] tapes come straight from the Panta program log because the API returns none. The live agent has run [runs] times and settled [settled] calls; Panta's catalogue is quiet, so the replay is the honest record.
+
+New this week: Sonar Curve. It follows Meteora Dynamic Bonding Curve launches from the chain alone (events from inner instructions, pool accounts from the IDL) and shows price, quote raised and progress to graduation for [pools] pools at sonarpanta.xyz/curve. Beside it is curve_market, an Anchor program for YES/NO markets on whether a launch graduates before a deadline, resolved by reading the pool account, with no oracle, no admin key and no fee. It runs on devnet with 45 tests and a written threat model, and the full flow (open, stake both sides, resolve, claim) has been run with real signatures.
+
+Everything is open source under MIT and runs on free tiers with zero spend. 17 Panta API issues are written up for the Panta team.
+
+What comes next: an audit and the mainnet deploy of curve_market, weekly Nigeria boards created for real, and the embeddable radar for creators. Thank you for reviewing.
 
 ## RPC Fast side track posts (October and November)
 
