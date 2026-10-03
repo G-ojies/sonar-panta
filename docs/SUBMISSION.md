@@ -146,7 +146,7 @@ Program to audit: `curve_market` (Anchor, Rust), parimutuel YES/NO markets on wh
 
 Roadmap, 6 to 12 months: (1) Q4 2026: audit and mainnet deploy of curve_market; markets panel live on sonarpanta.xyz; support for Meteora's TransferHookPool accounts. (2) Q1 2027: weekly Nigeria market boards on Panta, an embeddable Radar widget, and a Sonar Pro API for terminals and bots. (3) Q2 to Q3 2027: on-chain market making for thin Panta markets, more launch venues for Curve, and partnerships with Nigerian creators and communities. No token launch is planned.
 
-Team: Great Ojietohamen, founder and sole engineer (Rust, Anchor, TypeScript), X @Great_ojies, GitHub G-ojies, based in Benin City, Nigeria. Working on the project full-time alongside study.
+Team: Great Ojietohamen, founder and sole engineer (Rust, Anchor, TypeScript), X @Great_ojies, GitHub G-ojies, based in Benin City, Nigeria. Core team: one person. (CONFIRM: full-time or part-time.)
 
 Fundraising: bootstrapped, no outside funding and not raising now; plans to apply for ecosystem grants and to raise a pre-seed after mainnet traction.
 
@@ -161,6 +161,6 @@ Listing: https://superteam.fun/earn/listing/crypto-worlds-fair-project-for-akcav
 - **Project Website:** https://sonarpanta.xyz
 - **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
 - **Link to Colosseum project:** https://colosseum.com/arena/projects/sonar-for-panta
-- **Where does your team work from, and how (remote, co-located, travelling):** Solo builder working remotely from Benin City, Nigeria, mostly from home and from shared spaces on campus, coordinating online with Superteam Nigeria for pitch reviews and demo day.
-- **Why does a private connection matter for your team?:** I deploy programs and sign transactions from the same laptop I take onto shared campus and public networks, so a private connection protects deploy keys, API keys and wallet sessions. Nigerian networks are also unreliable and occasionally restricted, and a connection that keeps working helps me ship and pitch on time.
+- **Where does your team work from, and how (remote, co-located, travelling):** Solo builder working remotely from Benin City, Nigeria, coordinating online with Superteam Nigeria for pitch reviews and demo day, and travelling to events when possible.
+- **Why does a private connection matter for your team?:** I deploy programs and sign transactions from the same laptop I use on shared and public networks, so a private connection protects deploy keys, API keys and wallet sessions. Nigerian networks are also unreliable and occasionally restricted, and a connection that keeps working helps me ship and pitch on time.
 - **A brief description of your team (Name - Role, X link):** Great Ojietohamen - Founder and engineer, https://x.com/Great_ojies
