@@ -21,6 +21,9 @@ use {
 };
 
 pub const DBC_IDL: &str = include_str!("../../../../dbc-idl.json");
+/// Real mainnet TransferHookPool accounts and their configs (hex), read once
+/// with getMultipleAccounts; see the file's `slot`.
+pub const TRANSFER_HOOK_FIXTURE: &str = include_str!("../fixtures/transfer_hook_pools.json");
 
 pub const TOKEN_PROGRAM: Pubkey =
     Pubkey::from_str_const("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -76,6 +79,13 @@ impl Idl {
 
     pub fn discriminator(&self, account: &str) -> Vec<u8> {
         self.accounts[account].clone()
+    }
+
+    /// Every account type the IDL declares, sorted.
+    pub fn account_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.accounts.keys().cloned().collect();
+        names.sort();
+        names
     }
 
     fn size_of(&self, ty: &serde_json::Value) -> usize {
@@ -138,6 +148,26 @@ impl Idl {
         fields
     }
 
+    /// Offset of `field` inside the struct-typed field `outer` of `account`,
+    /// for wrappers with more than one field (`ConfigWithTransferHook.config`).
+    pub fn nested_offset(&self, account: &str, outer: &str, field: &str) -> usize {
+        let base = self.fields(account, 8).into_iter().find(|f| f.name == outer).expect("outer field");
+        let t = self.types[account]["fields"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["name"] == outer)
+            .unwrap()["type"]["defined"]["name"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        self.fields(&t, base.offset)
+            .into_iter()
+            .find(|f| f.name == field)
+            .unwrap_or_else(|| panic!("{account}.{outer}.{field} not in idl"))
+            .offset
+    }
+
     pub fn account_len(&self, account: &str) -> usize {
         8 + self.struct_size(account)
     }
@@ -152,11 +182,47 @@ impl Idl {
 }
 
 // ---------------------------------------------------------------------------
+// Real DBC accounts
+// ---------------------------------------------------------------------------
+
+/// One snapshotted pool and its config, as raw account data.
+pub struct RealPool {
+    pub pool: Pubkey,
+    pub pool_data: Vec<u8>,
+    pub config: Pubkey,
+    pub config_data: Vec<u8>,
+}
+
+fn unhex(s: &str) -> Vec<u8> {
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).expect("hex"))
+        .collect()
+}
+
+/// The snapshotted mainnet TransferHookPools, in file order.
+pub fn real_transfer_hook_pools() -> Vec<RealPool> {
+    let v: serde_json::Value = serde_json::from_str(TRANSFER_HOOK_FIXTURE).expect("fixture json");
+    v["accounts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|a| RealPool {
+            pool: a["pool"].as_str().unwrap().parse().unwrap(),
+            pool_data: unhex(a["poolData"].as_str().unwrap()),
+            config: a["config"].as_str().unwrap().parse().unwrap(),
+            config_data: unhex(a["configData"].as_str().unwrap()),
+        })
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Crafted DBC accounts
 // ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy, Debug)]
 pub struct PoolSpec {
+    pub kind: dbc::PoolKind,
     pub config: Pubkey,
     pub quote_reserve: u64,
     pub is_migrated: u8,
@@ -165,13 +231,38 @@ pub struct PoolSpec {
 
 impl PoolSpec {
     pub fn open(config: Pubkey) -> Self {
-        Self { config, quote_reserve: 1_000, is_migrated: 0, finish_curve_timestamp: 0 }
+        Self::open_kind(config, dbc::PoolKind::Virtual)
+    }
+
+    pub fn open_kind(config: Pubkey, kind: dbc::PoolKind) -> Self {
+        Self { kind, config, quote_reserve: 1_000, is_migrated: 0, finish_curve_timestamp: 0 }
+    }
+}
+
+/// Discriminator and full length of a pool account of `kind`.
+pub fn pool_layout(kind: dbc::PoolKind) -> ([u8; 8], usize) {
+    match kind {
+        dbc::PoolKind::Virtual => (dbc::VIRTUAL_POOL_DISCRIMINATOR, dbc::VIRTUAL_POOL_LEN),
+        dbc::PoolKind::TransferHook => {
+            (dbc::TRANSFER_HOOK_POOL_DISCRIMINATOR, dbc::TRANSFER_HOOK_POOL_LEN)
+        }
+    }
+}
+
+/// Discriminator and full length of a config account of `kind`.
+pub fn config_layout(kind: dbc::PoolKind) -> ([u8; 8], usize) {
+    match kind {
+        dbc::PoolKind::Virtual => (dbc::POOL_CONFIG_DISCRIMINATOR, dbc::POOL_CONFIG_LEN),
+        dbc::PoolKind::TransferHook => {
+            (dbc::CONFIG_WITH_TRANSFER_HOOK_DISCRIMINATOR, dbc::CONFIG_WITH_TRANSFER_HOOK_LEN)
+        }
     }
 }
 
 pub fn pool_bytes(spec: &PoolSpec) -> Vec<u8> {
-    let mut d = vec![0u8; dbc::VIRTUAL_POOL_LEN];
-    d[..8].copy_from_slice(&dbc::VIRTUAL_POOL_DISCRIMINATOR);
+    let (disc, len) = pool_layout(spec.kind);
+    let mut d = vec![0u8; len];
+    d[..8].copy_from_slice(&disc);
     d[dbc::pool_offsets::CONFIG..dbc::pool_offsets::CONFIG + 32]
         .copy_from_slice(spec.config.as_ref());
     d[dbc::pool_offsets::QUOTE_RESERVE..dbc::pool_offsets::QUOTE_RESERVE + 8]
@@ -183,13 +274,23 @@ pub fn pool_bytes(spec: &PoolSpec) -> Vec<u8> {
 }
 
 pub fn config_bytes(quote_mint: Pubkey, threshold: u64) -> Vec<u8> {
-    let mut d = vec![0u8; dbc::POOL_CONFIG_LEN];
-    d[..8].copy_from_slice(&dbc::POOL_CONFIG_DISCRIMINATOR);
+    config_bytes_kind(dbc::PoolKind::Virtual, quote_mint, threshold)
+}
+
+pub fn config_bytes_kind(kind: dbc::PoolKind, quote_mint: Pubkey, threshold: u64) -> Vec<u8> {
+    let (disc, len) = config_layout(kind);
+    let mut d = vec![0u8; len];
+    d[..8].copy_from_slice(&disc);
     d[dbc::config_offsets::QUOTE_MINT..dbc::config_offsets::QUOTE_MINT + 32]
         .copy_from_slice(quote_mint.as_ref());
     d[dbc::config_offsets::MIGRATION_QUOTE_THRESHOLD
         ..dbc::config_offsets::MIGRATION_QUOTE_THRESHOLD + 8]
         .copy_from_slice(&threshold.to_le_bytes());
+    if kind == dbc::PoolKind::TransferHook {
+        // transfer_hook_program follows the embedded PoolConfig; a non-zero
+        // key so a parser reading past the PoolConfig would notice.
+        d[dbc::POOL_CONFIG_LEN..dbc::POOL_CONFIG_LEN + 32].fill(0xEE);
+    }
     d
 }
 
@@ -206,7 +307,17 @@ pub fn set_pool(svm: &mut LiteSVM, key: Pubkey, spec: &PoolSpec) {
 }
 
 pub fn set_config(svm: &mut LiteSVM, key: Pubkey, quote_mint: Pubkey, threshold: u64) {
-    set_account(svm, key, dbc::DBC_PROGRAM_ID, config_bytes(quote_mint, threshold));
+    set_config_kind(svm, key, dbc::PoolKind::Virtual, quote_mint, threshold);
+}
+
+pub fn set_config_kind(
+    svm: &mut LiteSVM,
+    key: Pubkey,
+    kind: dbc::PoolKind,
+    quote_mint: Pubkey,
+    threshold: u64,
+) {
+    set_account(svm, key, dbc::DBC_PROGRAM_ID, config_bytes_kind(kind, quote_mint, threshold));
 }
 
 // ---------------------------------------------------------------------------

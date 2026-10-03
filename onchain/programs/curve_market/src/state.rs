@@ -32,9 +32,9 @@ pub enum MarketState {
 #[account]
 #[derive(InitSpace, Debug)]
 pub struct Market {
-    /// The DBC `VirtualPool` the market is about.
+    /// The DBC pool the market is about (`VirtualPool` or `TransferHookPool`).
     pub pool: Pubkey,
-    /// The DBC `PoolConfig` the pool points at.
+    /// The DBC config the pool points at (`PoolConfig` or `ConfigWithTransferHook`).
     pub config: Pubkey,
     /// The pool's quote mint. Stakes and payouts are in this token.
     pub quote_mint: Pubkey,
