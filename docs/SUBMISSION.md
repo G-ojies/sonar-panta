@@ -102,3 +102,65 @@ Earn form answers:
 - **Did you submit this project to the official Crypto World's Fair Hackathon on Colosseum? (Yes/No):** Yes (Crypto World's Fair, Solana track, country: Nigeria)
 - **Link to Colosseum project:** https://colosseum.com/arena/projects/sonar-for-panta
 - **Link to your project's Colosseum profile:** https://colosseum.com/arena/projects/sonar-for-panta (account GreYat_Labs)
+
+## Sonar Curve side tracks (Meteora DBC, Adevar Labs, CertiK), all due 13 October 2026 06:59 UTC
+
+All three use the same 9-field Earn form. Use greatojies@gmail.com. Colosseum allows one project per builder, so Curve is entered as a module of Sonar for Panta; say so plainly.
+
+Shared fields:
+
+- **Project Name:** Sonar for Panta (Sonar Curve module)
+- **Project Github Link:** https://github.com/G-ojies/sonar-panta (program in `onchain/`, Curve data path in `src/lib/dbc.ts`, docs in `docs/CURVE.md` and `docs/CURVE-PROGRAM.md`)
+- **Project Website:** https://sonarpanta.xyz/curve
+- **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
+- **Link to your pitch deck or Loom/video presentation:** https://sonarpanta.xyz/pitch (swap in the 60-second Curve clip from docs/VIDEOS.md once recorded)
+- **Did you submit this project to the official Crypto World's Fair Hackathon on Colosseum? (Yes/No):** Yes (Crypto World's Fair, Solana track, country: Nigeria)
+- **Link to Colosseum project:** https://colosseum.com/arena/projects/sonar-for-panta
+- **Link to your project's Colosseum profile:** https://colosseum.com/arena/projects/sonar-for-panta (account GreYat_Labs)
+
+### Meteora DBC: Project Description
+
+Sonar Curve is a data stream and a market primitive built directly on Meteora's Dynamic Bonding Curve.
+
+The data stream. Sonar decodes DBC from the chain with no SDK and no indexer: the program's `emit_cpi!` events (EvtInitializePool, EvtSwap2, EvtCurveComplete) are read from inner instructions, and VirtualPool and PoolConfig accounts are decoded from the IDL. For every launch it follows, Sonar shows the price along the curve (from sqrt_price in Q64.64), the quote raised, progress to the config's migration threshold, the status (trading, complete, migrated) and the prints behind it. It is served as a page at sonarpanta.xyz/curve and as JSON at /api/curve/launches and /api/curve/pool/<address>, so a trading terminal or launchpad can plug it in. Any pool can be opened by address. The index is sampled and bounded and costs about 0.2 GB a month on the wire; the method and measurements are in docs/CURVE.md.
+
+The market primitive. `curve_market` is an Anchor program for parimutuel YES/NO markets on whether a DBC pool graduates before a deadline. It resolves by reading the pool account itself (finish_curve_timestamp and is_migrated), so there is no oracle, no admin key and no fee. Launch communities get a way to put a price on conviction, and creators get a public signal of how likely their curve is to fill. It is deployed on devnet and was run end to end with real signatures: open a market, YES and NO stakes from two wallets, a resolve refused before the deadline, resolved after it, winner paid, loser's rent recovered. The program has 45 tests (LiteSVM) and a written threat model.
+
+Honest status: the program is on devnet; the live site shows the markets panel read-only until the mainnet deploy. The Curve data path runs on mainnet today. It sits inside Sonar for Panta, a live prediction-market signal desk on Solana (open source, MIT).
+
+### Adevar Labs: Project Description
+
+Sonar Curve's `curve_market` is a Solana/Rust (Anchor) program for parimutuel YES/NO markets on whether a Meteora DBC token launch graduates before a deadline. Users stake SOL on YES or NO; at the deadline anyone can resolve the market by passing the pool account, and the program reads graduation straight from that account, so there is no oracle, no admin key and no fee. Winners claim pro rata; losers recover their rent.
+
+Why a pre-audit matters here: the program holds user stakes in escrow and its security rests on reading a foreign program's account correctly (owner and discriminator checks, fixed offsets into a bytemuck layout, deadline and double-claim handling). The threat model, invariants and test map are in docs/CURVE-PROGRAM.md; 45 LiteSVM tests cover the paths. About 793 lines of program code and 1,213 lines of tests. Deployed on devnet at DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp and run end to end with real signatures. A pre-audit is the step before the mainnet deploy.
+
+It is part of Sonar for Panta (MIT, public repo), which also decodes the DBC event stream and pool accounts for a public launch index at sonarpanta.xyz/curve.
+
+### CertiK: Project Description
+
+Sonar for Panta is an open-source signal and trading desk for on-chain prediction markets on Solana, live at sonarpanta.xyz. Its new module, Sonar Curve, adds a program that holds user funds.
+
+Problem and users: prediction-market traders and token-launch communities have no honest, oracle-free way to price whether a launch will succeed. Target users are traders on Panta and Meteora DBC launch communities, starting with Nigeria through Superteam Nigeria.
+
+Program to audit: `curve_market` (Anchor, Rust), parimutuel YES/NO markets on whether a Meteora DBC pool graduates before a deadline, resolved from the pool account with no oracle or admin key. About 793 lines of program code, 1,213 lines of tests (45 LiteSVM tests), threat model in docs/CURVE-PROGRAM.md. Devnet: DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp. Target mainnet launch: after an audit, aiming for Q4 2026.
+
+Roadmap, 6 to 12 months: (1) Q4 2026: audit and mainnet deploy of curve_market; markets panel live on sonarpanta.xyz; support for Meteora's TransferHookPool accounts. (2) Q1 2027: weekly Nigeria market boards on Panta, an embeddable Radar widget, and a Sonar Pro API for terminals and bots. (3) Q2 to Q3 2027: on-chain market making for thin Panta markets, more launch venues for Curve, and partnerships with Nigerian creators and communities. No token launch is planned.
+
+Team: Great Ojietohamen, founder and sole engineer (Rust, Anchor, TypeScript), X @Great_ojies, GitHub G-ojies, based in Benin City, Nigeria. Working on the project full-time alongside study.
+
+Fundraising: bootstrapped, no outside funding and not raising now; plans to apply for ecosystem grants and to raise a pre-seed after mainnet traction.
+
+Contact for a scoping call: Telegram @G_Ojies or greatojies@gmail.com.
+
+## Superteam Earn: AkcaVPN credits (Akca Network), due 13 October 2026 06:59 UTC
+
+Listing: https://superteam.fun/earn/listing/crypto-worlds-fair-project-for-akcavpn-credits (Global, 10 winners, prize is AkcaVPN credits, not cash). 8 fields:
+
+- **Project Name:** Sonar for Panta
+- **Project Description:** Sonar for Panta is an open-source signal and trading desk for on-chain prediction markets on Solana. It scores every Panta market from its own trade tape, prices it against Polymarket and Kalshi, and lets users trade, claim and create markets non-custodially from their own wallet. A new module, Sonar Curve, decodes Meteora DBC token launches and adds an oracle-free Anchor program for markets on whether a launch graduates. Live at sonarpanta.xyz, MIT licensed.
+- **Project Website:** https://sonarpanta.xyz
+- **Project X Link:** https://x.com/Great_ojies/status/2103387182601994515
+- **Link to Colosseum project:** https://colosseum.com/arena/projects/sonar-for-panta
+- **Where does your team work from, and how (remote, co-located, travelling):** Solo builder working remotely from Benin City, Nigeria, mostly from home and from shared spaces on campus, coordinating online with Superteam Nigeria for pitch reviews and demo day.
+- **Why does a private connection matter for your team?:** I deploy programs and sign transactions from the same laptop I take onto shared campus and public networks, so a private connection protects deploy keys, API keys and wallet sessions. Nigerian networks are also unreliable and occasionally restricted, and a connection that keeps working helps me ship and pitch on time.
+- **A brief description of your team (Name - Role, X link):** Great Ojietohamen - Founder and engineer, https://x.com/Great_ojies
