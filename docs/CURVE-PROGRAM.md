@@ -208,7 +208,7 @@ The program keypair lives in `onchain/target/deploy/curve_market-keypair.json` a
 
 ### Upgrade for transfer-hook pools
 
-The devnet program (`DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp`, last deployed in slot 506,600,855, 264,064 bytes of program data, authority `FHj8w7MuuqMBeEKdFT2BXEEx9Xj6dZ18Z9cLiBmPr513`) predates `TransferHookPool` support, so on devnet `create_market` and `resolve` still refuse a `TransferHookPool` with error 6001. The `Market` and `Position` layouts and the instruction set are unchanged, so existing markets keep working after an upgrade and the web client needs no change beyond the error messages it already has. The new build is 265,480 bytes, 1,416 more than the deployed one, so the program data account has to grow. solana-cli 3.1 extends it automatically on deploy; the explicit form is:
+Done on devnet: the program (`DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp`) was extended by 10,240 bytes and upgraded in slot 506,942,309 (program data now 274,304 bytes), and on 4 October 2026 a dump of the deployed program matched the 265,480-byte `TransferHookPool` build byte for byte. The `Market` and `Position` layouts and the instruction set are unchanged, so existing markets keep working after an upgrade and the web client needs no change beyond the error messages it already has. The new build is 265,480 bytes, 1,416 more than the deployed one, so the program data account has to grow. solana-cli 3.1 extends it automatically on deploy; the explicit form is:
 
 ```
 solana program extend DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp 1416 -u devnet   # optional, deploy does it
