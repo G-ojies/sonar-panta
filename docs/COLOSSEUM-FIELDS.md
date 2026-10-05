@@ -56,13 +56,21 @@ Technologies field: add "Anchor, LiteSVM, Meteora Dynamic Bonding Curve" if it f
 
 # Final fields for the 6 October Submit, drafted 4 October 2026
 
-This section replaces both sections above: paste all five, then press Submit. Every text is within its limit (the editor silently refuses to save an over-limit field). On 6 October, re-read /api/agent and update the replay numbers in the last field if they moved. Changes from the earlier drafts: Curve is in the description, chains and technologies fields; the chains field was 504 characters and is now under 500; the test count is 72 (`cargo test` on 4 Oct); "have no open market on Panta today" became "rarely have an open market on Panta" because that cannot be checked in advance.
+This section replaces both sections above: paste all six, then press Submit. Every text is within its limit (the editor silently refuses to save an over-limit field). On 6 October, re-read /api/agent and update the replay numbers in the last field if they moved. Changes from the earlier drafts: Curve is in the description, chains and technologies fields; the chains field was 504 characters and is now under 500; the test count is 72 (`cargo test` on 4 Oct); "have no open market on Panta today" became "rarely have an open market on Panta" because that cannot be checked in advance.
 
 ## Brief description (max 500)
 
 The intelligence layer for on-chain prediction markets. Sonar scores every Panta market on Solana from its own trade tape, decoded from the program log, prices it against Polymarket and Kalshi, and lets users trade, claim and create markets non-custodially. Sonar Curve adds a Meteora DBC launch index and an oracle-free Anchor program for markets on whether a launch graduates. A walk-forward replay over every resolved market is the public record. Open source, MIT.
 
 (467 characters)
+
+## What are you building, and who is it for? (max 1000)
+
+Added 5 October after reading the live editor, which has this field too; the current text (972) has no Curve.
+
+Sonar for Panta is the intelligence and execution layer for on-chain prediction markets. Panta gives any app a permissionless market-creation and trading API on Solana, but an API gives you a price and a tape, not a read. Sonar scores every Panta market from its own tape (flow, momentum, whale prints, concentration), records the price history Panta does not expose, and prices each question against Polymarket and Kalshi. From one screen users buy YES/NO non-custodially, claim winnings, and create markets from a headline with Claude drafting the rule. An agent paper-trades every call and settles against Panta's resolutions. Sonar Curve extends this to Meteora DBC launches: a decoded launch index and an oracle-free program for markets on whether a launch graduates. It is for traders who want an edge, creators who want markets that attract flow (starting with Nigerian events: CBN, inflation, naira, NGX, Super Eagles), and bots that need a signal feed.
+
+(961 characters)
 
 ## Why did you decide to build this, and why now? (max 1000)
 
