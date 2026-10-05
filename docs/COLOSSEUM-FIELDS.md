@@ -51,3 +51,39 @@ Zero spend: free tiers, and sandbox mode runs the full trade, claim and create f
 (465 characters)
 
 Technologies field: add "Anchor, LiteSVM, Meteora Dynamic Bonding Curve" if it fits under 500 (currently 488, so replace "cron-job.org and GitHub Actions schedulers" with "GitHub Actions" to make room).
+
+
+
+# Final fields for the 6 October Submit, drafted 4 October 2026
+
+This section replaces both sections above: paste all five, then press Submit. Every text is within its limit (the editor silently refuses to save an over-limit field). On 6 October, re-read /api/agent and update the replay numbers in the last field if they moved. Changes from the earlier drafts: Curve is in the description, chains and technologies fields; the chains field was 504 characters and is now under 500; the test count is 72 (`cargo test` on 4 Oct); "have no open market on Panta today" became "rarely have an open market on Panta" because that cannot be checked in advance.
+
+## Brief description (max 500)
+
+The intelligence layer for on-chain prediction markets. Sonar scores every Panta market on Solana from its own trade tape, decoded from the program log, prices it against Polymarket and Kalshi, and lets users trade, claim and create markets non-custodially. Sonar Curve adds a Meteora DBC launch index and an oracle-free Anchor program for markets on whether a launch graduates. A walk-forward replay over every resolved market is the public record. Open source, MIT.
+
+(467 characters)
+
+## Why did you decide to build this, and why now? (max 1000)
+
+Prediction markets became infrastructure in 2026: Kalshi and Polymarket cleared $44.8B in June alone, almost all of it off-chain, US-centric and permissioned. Panta's public API is weeks old and puts the same primitive on Solana, but every integrator starts blind: no history, no analytics, no view of whether a market is cheap or rich against the world. The first integrations will define what "Panta-powered" means, and the intelligence layer is cheapest to build while the catalog is small. I already run Sonar, a live behavioural-signal engine on Kalshi and Polymarket with 672 resolved signals at a 57.7% 30-day win rate, so this is a port of a working engine, not a new hypothesis. Nigeria made it urgent: the questions Nigerians argue about every week (the CBN rate, inflation, the naira, the NGX, the Super Eagles, the petrol price) rarely have an open market on Panta. USDC-settled, permissionless markets with honest pricing are that product; Superteam Nigeria is the distribution.
+
+(991 characters)
+
+## What technologies are you using (max 500)
+
+Panta API (14 endpoints: catalog, detail, trades, positions, primary buy quote/build/submit/verify, create quote/build/register, claim build, trade attribution), Solana (web3.js, wallet-adapter, Phantom, Solflare), Anchor, LiteSVM, Meteora Dynamic Bonding Curve, Solami RPC and WebSocket, Next.js 14, TypeScript, Tailwind, Upstash Redis, Render, GitHub Actions, Polymarket Gamma API, Kalshi API, Anthropic Claude API (market drafting), Claude Code (development)
+
+(461 characters)
+
+## How does your product use these chains? (max 500)
+
+Every write is a Solana transaction the user signs. Panta builds the instructions (buy, claim) or a VersionedTransaction (market creation); the wallet signs, Sonar broadcasts and reports the signature. Where Panta's trades endpoint is empty, Sonar decodes prints from the program log and streams new ones over logsSubscribe. Sonar Curve decodes Meteora DBC events and pool accounts on mainnet; curve_market, an Anchor program on devnet, resolves from the pool account itself. USDC settles positions.
+
+(499 characters)
+
+## Anything else judges should know (max 500)
+
+Zero spend: free tiers, and sandbox mode runs the full trade, claim and create flows on Panta test fixtures with an empty wallet. The record is a walk-forward replay over every resolved market (129 markets, 73 calls, 45 hits on 4 Oct), reported as-is. curve_market is on devnet with 72 passing tests and a threat model. 17 Panta API issues are documented. Also entered in the Panta, Superteam Nigeria, Solami, RPC Fast, Meteora, Adevar, CertiK and AkcaVPN side tracks. MIT.
+
+(473 characters)
