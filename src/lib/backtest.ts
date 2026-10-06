@@ -10,8 +10,8 @@
  */
 import { getMarket, getMarketTrades, marketYesPrice } from './panta';
 import { computeSignals } from './signals';
-import { mergeTapes } from './chain-tape';
-import { RESOLVED_IDS_KEY, readChainTape, readRadar } from './radar';
+import { mergeTapes, type ChainTapeCache } from './chain-tape';
+import { CHAIN_TAPE_KEY, RESOLVED_IDS_KEY, readRadar } from './radar';
 import { store } from './store';
 import type { MarketDetail, Snapshot, Trade } from './types';
 
@@ -80,6 +80,9 @@ export async function runBacktest(opts: { maxMarkets?: number } = {}): Promise<B
   const ids = [...new Set([...byId.keys(), ...remembered])].slice(0, opts.maxMarkets ?? 200);
   const rows: BacktestRow[] = [];
   let chainTapes = 0;
+  // every chain tape in one MGET (Upstash bills per command)
+  const chains = new Map(ids.map((id, i) => [id, i]));
+  const chainRows = await s.mget<ChainTapeCache>(ids.map(CHAIN_TAPE_KEY));
   for (const id of ids) {
     try {
       let entry = byId.get(id);
@@ -94,7 +97,7 @@ export async function runBacktest(opts: { maxMarkets?: number } = {}): Promise<B
       if (!d.onChain?.isResolved && d.phase !== 'resolved') continue;
       const title = d.title || d.question || d.onChain?.question || '';
       if (!title) continue;
-      const chain = await readChainTape(id);
+      const chain = chainRows[chains.get(id)!] ?? null;
       const tape = chain ? mergeTapes(entry.tape, chain.trades) : entry.tape;
       const chainPrints = tape.filter((t) => t.source === 'chain').length;
       if (chainPrints) chainTapes++;

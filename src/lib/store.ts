@@ -11,6 +11,8 @@ type Json = unknown;
 
 interface Backend {
   get<T = Json>(k: string): Promise<T | null>;
+  /** Many keys in one command (Upstash bills per command, so a scan reads its per-market keys this way). */
+  mget<T = Json>(keys: string[]): Promise<(T | null)[]>;
   set(k: string, v: Json, ttlSec?: number): Promise<void>;
   del(k: string): Promise<void>;
   lpush(k: string, v: Json, cap?: number): Promise<void>;
@@ -24,6 +26,11 @@ function redisBackend(): Backend | null {
   const r = new Redis({ url, token });
   return {
     async get(k) { return (await r.get(k)) as never; },
+    async mget(keys) {
+      const out: unknown[] = [];
+      for (let i = 0; i < keys.length; i += 200) out.push(...(await r.mget(...keys.slice(i, i + 200))));
+      return out as never;
+    },
     async set(k, v, ttl) { if (ttl) await r.set(k, v, { ex: ttl }); else await r.set(k, v); },
     async del(k) { await r.del(k); },
     async lpush(k, v, cap) { await r.lpush(k, v); if (cap) await r.ltrim(k, 0, cap - 1); },
@@ -55,6 +62,7 @@ function memoryBackend(file?: string): Backend {
     } catch { /* missing or mid-write: keep memory copy */ }
   };
   return {
+    async mget(keys) { return Promise.all(keys.map((k) => this.get(k))) as never; },
     async get(k) { sync(); const c = kv[k]; if (!c) return null; if (c.exp && c.exp < Date.now()) { delete kv[k]; return null; } return c.v as never; },
     // reload before every write so a process with a stale copy never overwrites another writer's data
     async set(k, v, ttl) { sync(); kv[k] = { v, exp: ttl ? Date.now() + ttl * 1000 : undefined }; persist(); },
@@ -68,6 +76,27 @@ let backend: Backend | null = null;
 export function store(): Backend {
   if (backend) return backend;
   backend = redisBackend() ?? memoryBackend(process.env.SONAR_STORE_FILE);
+  if (process.env.SONAR_STORE_STATS) backend = counted(backend);
   return backend;
+}
+
+// SONAR_STORE_STATS=1 prints how many commands and bytes a run cost, for sizing against the Upstash quota.
+function counted(b: Backend): Backend {
+  const n: Record<string, number> = {}; let bytes = 0;
+  const size = (v: unknown) => (v == null ? 0 : JSON.stringify(v).length);
+  const hit = (op: string, k: string) => { const key = `${op} ${k.split(':').slice(0, 2).join(':')}`; n[key] = (n[key] ?? 0) + 1; };
+  process.on('exit', () => {
+    const total = Object.values(n).reduce((a, x) => a + x, 0);
+    console.error(`store: ${total} commands, ${(bytes / 1e6).toFixed(2)} MB`);
+    for (const [k, x] of Object.entries(n).sort((a, z) => z[1] - a[1])) console.error(`  ${String(x).padStart(5)} ${k}`);
+  });
+  return {
+    async get(k) { hit('get', k); const v = await b.get(k); bytes += size(v); return v as never; },
+    async mget(keys) { if (keys.length) hit('mget', keys[0]); const v = await b.mget(keys); bytes += size(v); return v as never; },
+    async set(k, v, ttl) { hit('set', k); bytes += size(v); return b.set(k, v, ttl); },
+    async del(k) { hit('del', k); return b.del(k); },
+    async lpush(k, v, cap) { hit('lpush', k); bytes += size(v); return b.lpush(k, v, cap); },
+    async lrange(k, a, z) { hit('lrange', k); const v = await b.lrange(k, a, z); bytes += size(v); return v as never; },
+  };
 }
 export const storeKind = () => (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL ? 'redis' : process.env.SONAR_STORE_FILE ? 'file' : 'memory');

@@ -111,11 +111,17 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   // serves (deleted or never published). Count strikes so the registry can let it go instead of
   // reporting the same fourteen ids as "API errors" forever.
   const strikes = (await s.get<Record<string, number>>(K.strikes)) ?? {};
+  const strikesBefore = JSON.stringify(strikes);
+  // Upstash bills per command: read every cached row in one MGET instead of one GET per market,
+  // and write a row back only when it changed.
+  const toFetch = ids.filter((id) => !settled.has(id));
+  const cachedRows = new Map(toFetch.map((id, i) => [id, i]));
+  const cachedDetails = await s.mget<MarketDetail>(toFetch.map((id) => K.detail(id)));
   const fetched = await mapLimit(ids, 4, async (id) => {
     try {
       const kept = settled.get(id);
       if (kept) return kept.detail;
-      const cached = await s.get<MarketDetail>(K.detail(id));
+      const cached = cachedDetails[cachedRows.get(id)!] ?? null;
       if (cached && cached.phase === 'resolved' && hasContent(cached)) return cached; // resolved rows never change
       let d = await getMarket(id);
       // Panta's detail endpoint intermittently answers with a stripped row (blank title, no onChain
@@ -130,7 +136,7 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
       }
       delete strikes[id];
       // resolved rows never change: keep them for a month so a stripped answer later has a good copy to fall back on
-      await s.set(K.detail(id), d, d.phase === 'resolved' ? 30 * 86400 : 6 * 3600);
+      if (!cached || JSON.stringify(cached) !== JSON.stringify(d)) await s.set(K.detail(id), d, d.phase === 'resolved' ? 30 * 86400 : 6 * 3600);
       return d;
     } catch (e) { errors.push(`detail ${id}: ${(e as Error).message}`); return null; }
   });
@@ -144,26 +150,36 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
   // Failed fetches and fresher stripped ones stay so the next scan retries them.
   const drop = new Set(ids.filter((_, i) => fetched[i] && !shouldTrack(fetched[i] as MarketDetail, now)));
   for (const [id, n] of Object.entries(strikes)) if (n >= STRIKES_LIMIT) { drop.add(id); delete strikes[id]; }
-  await s.set(K.strikes, strikes);
-  await s.set(K.known, [...new Set([...knownIds, ...ids])].filter((id) => !drop.has(id)).slice(-2000));
+  if (JSON.stringify(strikes) !== strikesBefore) await s.set(K.strikes, strikes);
+  const nextKnown = [...new Set([...knownIds, ...ids])].filter((id) => !drop.has(id)).slice(-2000);
+  if (JSON.stringify(nextKnown) !== JSON.stringify(knownIds)) await s.set(K.known, nextKnown);
 
   // Open markets first so a live market gets its chain tape before the resolved history does.
   details.sort((a, b) => Number(b.phase !== 'resolved') - Number(a.phase !== 'resolved'));
   let chainBudget = CHAIN_TAPES_PER_SCAN;
+  // the per-market keys of every market still being scanned, in one MGET (five keys a market)
+  const live = details.filter((d) => !settled.has(d.marketId)).map((d) => d.marketId);
+  const slot = new Map(live.map((id, i) => [id, i * 5]));
+  const pre = await s.mget(live.flatMap((id) => [K.tape(id), K.chain(id), K.snaps(id), K.venue(id), `${K.venue(id)}:ts`]));
   const markets = await mapLimit(details, 4, async (d): Promise<RadarMarket | null> => {
     try {
       const id = d.marketId;
       const kept = settled.get(id);
       if (kept) return kept;
+      const at = slot.get(id)!;
+      const [cachedTape, cachedChain, cachedSnaps, cachedVenue, venueTs] = pre.slice(at, at + 5) as [Trade[] | null, ChainTapeCache | null, Snapshot[] | null, VenueMatch | null, number | null];
       let tape: Trade[] = [];
       let complete = false;
-      try { tape = (await getMarketTrades(id, 200)).items; await s.set(K.tape(id), tape, 3600); }
-      catch (e) { tape = (await s.get<Trade[]>(K.tape(id))) ?? []; errors.push(`tape ${id}: ${(e as Error).message}`); }
+      try {
+        tape = (await getMarketTrades(id, 200)).items;
+        if (!cachedTape || JSON.stringify(cachedTape) !== JSON.stringify(tape)) await s.set(K.tape(id), tape, 3600);
+      }
+      catch (e) { tape = cachedTape ?? []; errors.push(`tape ${id}: ${(e as Error).message}`); }
       // The trades endpoint is empty for most resolved markets and every graduated one, and short for others
       // (feedback item 17). The program logs every primary order, so rebuild the tape from chain when the API
       // returned fewer prints than the chain counts; resolved tapes never change, so they are fetched once.
       if (tapeIsShort(tape, d.onChain?.totalTrades)) {
-        let chain = await s.get<ChainTapeCache>(K.chain(id));
+        let chain = cachedChain;
         // a resolved or graduated market takes no more primary orders: fetch its tape once. (The chain counter also
         // includes the creator's seed at creation, which is not a print, so the merged tape can stay one short.)
         const frozen = d.phase === 'resolved' || !!d.onChain?.isGraduated;
@@ -185,10 +201,10 @@ export async function refreshRadar(opts: { venues?: boolean; maxMarkets?: number
         complete = frozen && !!chain?.complete;
       } else complete = true;
       const yesPrice = marketYesPrice(d);
-      const snaps = (await s.get<Snapshot[]>(K.snaps(id))) ?? [];
+      const snaps = cachedSnaps ?? [];
       const question = d.title || d.question || d.onChain?.question || '';
-      let venue: VenueMatch | null = (await s.get<VenueMatch>(K.venue(id))) ?? null;
-      if (opts.venues !== false && question && d.phase !== 'resolved' && (!venue || (now - (await s.get<number>(`${K.venue(id)}:ts`) ?? 0)) > VENUE_RECHECK_S)) {
+      let venue: VenueMatch | null = cachedVenue;
+      if (opts.venues !== false && question && d.phase !== 'resolved' && (!venue || now - (venueTs ?? 0) > VENUE_RECHECK_S)) {
         try { venue = await matchVenues(question); await s.set(K.venue(id), venue ?? { none: true }, 6 * 3600); await s.set(`${K.venue(id)}:ts`, now); }
         catch (e) { errors.push(`venue ${id}: ${(e as Error).message}`); }
       }
