@@ -80,7 +80,7 @@ Prediction markets became infrastructure in 2026: Kalshi and Polymarket cleared 
 
 ## What technologies are you using (max 500)
 
-Panta API (14 endpoints: catalog, detail, trades, positions, primary buy quote/build/submit/verify, create quote/build/register, claim build, trade attribution), Solana (web3.js, wallet-adapter, Phantom, Solflare), Anchor, LiteSVM, Meteora Dynamic Bonding Curve, Solami RPC and WebSocket, Next.js 14, TypeScript, Tailwind, Upstash Redis, Render, GitHub Actions, Polymarket Gamma API, Kalshi API, Anthropic Claude API (market drafting), Claude Code (development)
+Panta API (14 endpoints: catalog, detail, trades, positions, primary buy quote/build/submit/verify, create quote/build/register, claim build, trade attribution), Solana (web3.js, wallet-adapter, Phantom, Solflare), Anchor, LiteSVM, Meteora Dynamic Bonding Curve, RPC Fast (RPC and WebSocket), Solami (history), Next.js 14, TypeScript, Tailwind, Upstash Redis, Render, GitHub Actions, Polymarket Gamma API, Kalshi API, Anthropic Claude API (market drafting), Claude Code (development)
 
 (461 characters)
 
