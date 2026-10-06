@@ -6,6 +6,7 @@ import { config as dotenv } from 'dotenv';
 dotenv({ path: '.env.local' }); dotenv();
 import { readFileSync } from 'fs';
 import { Redis } from '@upstash/redis';
+import { pack } from '../src/lib/store';
 
 async function main() {
   const file = process.argv[2] ?? process.env.SONAR_STORE_FILE ?? '.sonar-store.json';
@@ -18,7 +19,8 @@ async function main() {
   let n = 0;
   for (const [k, c] of Object.entries(j.kv)) {
     if (c.exp && c.exp < now) continue;
-    if (c.exp) await r.set(k, c.v, { ex: Math.ceil((c.exp - now) / 1000) }); else await r.set(k, c.v);
+    const v = pack(c.v); // large values go gzipped, as the app writes them
+    if (c.exp) await r.set(k, v, { ex: Math.ceil((c.exp - now) / 1000) }); else await r.set(k, v);
     n++;
   }
   for (const [k, l] of Object.entries(j.lists)) {

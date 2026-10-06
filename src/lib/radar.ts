@@ -242,8 +242,9 @@ export function rank(a: RadarMarket, b: RadarMarket): number {
 }
 
 // The radar is the largest value in the store and every page, the health check and the chart poll read it.
-// One copy is kept in this process for a minute, so those reads do not each fetch it again.
-const READ_TTL_MS = 60_000;
+// One copy is kept in this process for five minutes (the tick rewrites it every twenty), so those reads do not
+// each fetch it again; that read was most of the store's monthly bandwidth.
+const READ_TTL_MS = 5 * 60_000;
 let radarCache: { at: number; value: RadarOutput | null } | null = null;
 let logCache: { at: number; value: RefreshLogRow[] } | null = null;
 type RefreshLogRow = { ts: number; scanned: number; kept: number; errors: number; skipped?: number; durationMs: number };

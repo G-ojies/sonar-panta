@@ -6,6 +6,7 @@
  */
 import { Redis } from '@upstash/redis';
 import nodeFs from 'fs';
+import { gunzipSync, gzipSync } from 'zlib';
 
 type Json = unknown;
 
@@ -19,19 +20,32 @@ interface Backend {
   lrange<T = Json>(k: string, start: number, stop: number): Promise<T[]>;
 }
 
+// Upstash's free plan caps bandwidth at 10 GB a month, and the radar alone is about 1 MB of JSON.
+// Large values travel gzipped (as a "gz:" base64 string, roughly a fifth of the size); small ones and
+// anything written before this stay plain JSON and read as before.
+const GZ = 'gz:';
+const GZ_MIN = 16_000;
+export function pack(v: Json): Json {
+  const s = JSON.stringify(v);
+  return s && s.length > GZ_MIN ? GZ + gzipSync(s).toString('base64') : v;
+}
+export function unpack<T>(v: unknown): T {
+  return (typeof v === 'string' && v.startsWith(GZ) ? JSON.parse(gunzipSync(Buffer.from(v.slice(GZ.length), 'base64')).toString('utf8')) : v) as T;
+}
+
 function redisBackend(): Backend | null {
   const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
   const r = new Redis({ url, token });
   return {
-    async get(k) { return (await r.get(k)) as never; },
+    async get(k) { return unpack(await r.get(k)); },
     async mget(keys) {
       const out: unknown[] = [];
       for (let i = 0; i < keys.length; i += 200) out.push(...(await r.mget(...keys.slice(i, i + 200))));
-      return out as never;
+      return out.map((v) => unpack(v)) as never;
     },
-    async set(k, v, ttl) { if (ttl) await r.set(k, v, { ex: ttl }); else await r.set(k, v); },
+    async set(k, v, ttl) { const p = pack(v); if (ttl) await r.set(k, p, { ex: ttl }); else await r.set(k, p); },
     async del(k) { await r.del(k); },
     async lpush(k, v, cap) { await r.lpush(k, v); if (cap) await r.ltrim(k, 0, cap - 1); },
     async lrange(k, a, b) { return (await r.lrange(k, a, b)) as never; },
