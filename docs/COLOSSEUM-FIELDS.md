@@ -92,6 +92,8 @@ Every write is a Solana transaction the user signs. Panta builds the instruction
 
 ## Anything else judges should know (max 500)
 
-Zero spend: free tiers, and sandbox mode runs the full trade, claim and create flows on Panta test fixtures with an empty wallet. The record is a walk-forward replay over every resolved market (129 markets, 73 calls, 45 hits on 4 Oct), reported as-is. curve_market is on devnet with 72 passing tests and a threat model. 17 Panta API issues are documented. Also entered in the Panta, Superteam Nigeria, Solami, RPC Fast, Meteora, Adevar, CertiK and AkcaVPN side tracks. MIT.
+Zero spend: free tiers, and sandbox mode runs the full trade, claim and create flows on Panta test fixtures with an empty wallet. The record is a walk-forward replay over every resolved market (124 markets, 69 calls, 38 hits on 6 Oct), reported as-is. curve_market is on devnet with 72 passing tests and a threat model. 17 Panta API issues are documented. Also entered in the Panta, Superteam Nigeria, Solami, RPC Fast, Meteora, Adevar, CertiK and AkcaVPN side tracks. MIT.
 
 (473 characters)
+
+Note, 6 October: the Upstash store was suspended for its monthly bandwidth limit and replaced. The replay was rebuilt from chain (all 202 Panta markets found on chain, tapes through the public RPC) and now reads 124 markets, 69 calls, 38 hits (55%), down from 130/74/45 before the rebuild. The last field above carries the rebuilt numbers and is saved in the editor.
