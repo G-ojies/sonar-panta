@@ -5,6 +5,7 @@
 | Demo | https://youtu.be/F6bmSKXT0fg (unlisted) | 2:03 | Colosseum demo-video field, Earn forms |
 | Pitch | https://www.loom.com/share/64fdea3e83e147ee865af08b016792fa | 2:36 | Colosseum pitch-video field, Earn forms |
 | Week 2 update | https://youtu.be/5IAtZnIBcpU (unlisted) | 0:53 | Colosseum builder update, 25 September |
+| Week 4 update | https://youtu.be/Qx1EIh8-QMQ (unlisted) | 0:59 | Colosseum weekly video, week 4 (9 October); built by ~/Development/sonar-week4-video |
 
 YouTube descriptions below are paste-ready. Titles first, then the description. Links became clickable once the channel was verified (27 September 2026).
 
