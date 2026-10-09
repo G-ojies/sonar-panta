@@ -1,7 +1,7 @@
 /**
  * Watch the live tape stream from a terminal.
  *   npm run stream                  # subscribe and print every Panta transaction the node pushes
- *   npm run stream -- --replay 5    # first push the program's last 5 transactions through the same decode path
+ *   npm run stream -- --replay 5    # first push the program's last 5 transactions through the same decode path; replayed prints already stored are marked
  * Connects to the endpoint the server would use: RPC Fast with RPCFAST_API_KEY set, Solami with SOLAMI_API_KEY, the public one without.
  * Reads the market registry from the store named by .env.local and writes nothing: decoded prints are printed
  * here, not stored. The server's own stream (started by /api/health) is the one that stores them.
@@ -20,14 +20,25 @@ const replay = replayIdx > -1 ? Number(process.argv[replayIdx + 1] || 5) : 0;
 
 // reads fall through to the real store, writes stay in this process
 const local = new Map<string, unknown>();
+// --replay feeds transactions Sonar has usually stored already; show their prints too, marked as such
+const replayed = new Set<string>();
+const stored = new Set<string>();
 const readOnly = {
-  async get<T>(k: string): Promise<T | null> { return local.has(k) ? (local.get(k) as T) : store().get<T>(k); },
+  async get<T>(k: string): Promise<T | null> {
+    if (local.has(k)) return local.get(k) as T;
+    const v = await store().get<T>(k);
+    if (!replayed.size || !k.startsWith('sonar:chaintape:') || !v) return v;
+    // hide the replayed transactions from the stored tape so their prints go through the append path and get shown
+    const tape = v as unknown as ChainTapeCache;
+    for (const t of tape.trades) if (replayed.has(t.signature)) stored.add(t.id);
+    return { ...tape, trades: tape.trades.filter((t) => !replayed.has(t.signature)) } as T;
+  },
   async set(k: string, v: unknown) {
     if (k.startsWith('sonar:chaintape:')) {
       const had = new Set(((await readOnly.get<ChainTapeCache>(k))?.trades ?? []).map((t) => t.id));
       for (const t of (v as ChainTapeCache).trades.filter((x) => !had.has(x.id))) {
         const lag = t.blockTime ? Math.round(Date.now() / 1000 - t.blockTime) : null;
-        console.log(`[${at()}] print   ${t.side.toUpperCase().padEnd(3)} ${Number(t.shares).toFixed(2)} shares, YES ${((t.price ?? 0) * 100).toFixed(1)}c after  market ${t.marketId}  tx ${t.signature.slice(0, 12)}…  ${lag !== null && lag < 600 ? `${lag}s after the block` : 'from history'}`);
+        console.log(`[${at()}] print   ${t.side.toUpperCase().padEnd(3)} ${Number(t.shares).toFixed(2)} shares, YES ${((t.price ?? 0) * 100).toFixed(1)}c after  market ${t.marketId}  tx ${t.signature.slice(0, 12)}…  ${lag !== null && lag < 600 ? `${lag}s after the block` : 'from history'}${stored.has(t.id) ? ', already on the stored tape' : ''}`);
       }
     }
     local.set(k, v);
@@ -61,6 +72,7 @@ const line = () => {
     // real transactions, fed in as the frames the node would have pushed: the decode and mapping path is the live one
     const rows = await rpc<{ signature: string; slot: number; err: unknown }[]>('getSignaturesForAddress', [PANTA_PROGRAM_MAINNET, { limit: replay }]);
     console.log(`[${at()}] replay  ${rows.length} recent program transactions`);
+    for (const r of rows) replayed.add(r.signature);
     for (const r of rows.reverse()) {
       const tx = await rpc<Tx | null>('getTransaction', [r.signature, { encoding: 'json', maxSupportedTransactionVersion: 0 }]);
       if (!tx) continue;
