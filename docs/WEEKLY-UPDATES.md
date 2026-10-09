@@ -97,13 +97,15 @@ Next: final submission on 6 October, the Superteam Nigeria pitch reviews and dem
 
 Post on the Builder updates feed on 9 October with two images: the Curve pool page with the markets panel, and the Agent page. Fill every [bracket] from the live site that morning; do not post a number that was not re-read that day.
 
+Filled 9 October from the live site (/api/agent backtest ran 9 Oct, /api/curve/launches 46 pools kept). Re-read once more just before posting if it goes out later than 9 October.
+
 ### Post text
 
 Sonar for Panta, week four, and the final update.
 
-The project is submitted. Where it stands today: the replay over every resolved Panta market has made [calls] calls on [markets] markets with [hits] right ([rate]%), walking each tape print by print with no look-ahead. [N] tapes come straight from the Panta program log because the API returns none. The live agent has run [runs] times and settled [settled] calls; Panta's catalogue is quiet, so the replay is the honest record.
+The project is submitted. Where it stands today: the replay over every resolved Panta market has made 76 calls on 135 markets with 45 right (59%), walking each tape print by print with no look-ahead, and it is slightly ahead per dollar staked. 105 of those tapes come straight from the Panta program log because the API returns none or only part of one. The live agent has run 1,145 times and settled 2 calls (one right, one wrong); Panta's catalogue is quiet, so the replay is the honest record.
 
-New this week: Sonar Curve. It follows Meteora Dynamic Bonding Curve launches from the chain alone (events from inner instructions, pool accounts from the IDL) and shows price, quote raised and progress to graduation for [pools] pools at sonarpanta.xyz/curve. Beside it is curve_market, an Anchor program for YES/NO markets on whether a launch graduates before a deadline, resolved by reading the pool account, with no oracle, no admin key and no fee. It runs on devnet with 72 passing tests and a written threat model, and the full flow (open, stake both sides, resolve, claim) has been run with real signatures.
+New this week: Sonar Curve. It follows Meteora Dynamic Bonding Curve launches from the chain alone (events from inner instructions, pool accounts from the IDL) and shows price, quote raised and progress to graduation for 46 pools at sonarpanta.xyz/curve. Beside it is curve_market, an Anchor program for YES/NO markets on whether a launch graduates before a deadline, resolved by reading the pool account, with no oracle, no admin key and no fee. It runs on devnet with 72 passing tests and a written threat model, and the full flow (open, stake both sides, resolve, claim) has been run with real signatures.
 
 Everything is open source under MIT and runs on free tiers with zero spend. 17 Panta API issues are written up for the Panta team.
 
