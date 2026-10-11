@@ -3,7 +3,7 @@ import { readAgent, runAgent, summarize } from '@/lib/agent';
 import { readBacktest, runBacktest } from '@/lib/backtest';
 import { curveTick } from '@/lib/curve';
 import { store } from '@/lib/store';
-import { fail } from '../_util';
+import { fail, readOnly } from '../_util';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
@@ -31,6 +31,8 @@ export async function GET() {
  * even if the last was recent.
  */
 export async function POST(req: NextRequest) {
+  const off = readOnly();
+  if (off) return off;
   const secret = process.env.CRON_SECRET;
   if (secret && req.headers.get('authorization') !== `Bearer ${secret}` && req.nextUrl.searchParams.get('key') !== secret) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   const s = store();
