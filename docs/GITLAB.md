@@ -28,8 +28,10 @@ project at github.com/G-ojies/sonar-panta). The pipeline is `.gitlab-ci.yml`; th
 4. **Render service** (a second free web service, separate from sonarpanta.xyz):
    - New Web Service, connect the GitLab project, branch main, same build/start commands as `render.yaml`.
    - **Auto-deploy off.** The pipeline deploys.
-   - Env vars: copy from the sonarpanta service, but **leave out CRON_SECRET**, so nothing can drive
-     the agent tick on this instance (no second writer to Upstash), and leave out RPCFAST_API_KEY (public RPC is enough).
+   - Env vars: copy from the sonarpanta service, then set **`SONAR_READ_ONLY=1`**. That turns off the scan, the
+     agent tick and the live tape stream on this instance, so it never becomes a second writer to Upstash (the cause
+     of the 6 Oct outage). Do not just drop CRON_SECRET: without it those routes accept anyone. Leave out
+     RPCFAST_API_KEY (public RPC is enough).
    - Settings > Deploy Hook: copy the URL.
 5. **CI/CD variables** (Settings > CI/CD > Variables, all protected; mask the hook):
    - `RENDER_DEPLOY_HOOK_URL`: the deploy hook (masked).
