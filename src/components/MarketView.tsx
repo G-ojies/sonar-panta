@@ -10,6 +10,7 @@ import { ConfidenceDots, ScoreBar, SideChip } from './SignalBadge';
 import { Sparkline } from './Sparkline';
 import { LiveChart } from './LiveChart';
 import { TradePanel } from './TradePanel';
+import { BriefPanel } from './BriefPanel';
 import { PoweredByPanta } from './PoweredByPanta';
 
 interface MarketPayload { detail: MarketDetail; yesPrice: number | null; tape: Trade[]; signals: SignalSet; venue: VenueMatch | null; tradable: boolean; snapshots: Snapshot[]; updatedAt: number; chain?: ChainHealth }
@@ -137,6 +138,7 @@ export function MarketView({ id }: { id: string }) {
         </div>
 
         <aside className="space-y-4">
+          <BriefPanel marketId={d.marketId} side={s.side} closed={d.phase === 'resolved' || d.phase === 'cancelled' || Number(d.endTime) <= now} />
           <TradePanel market={d} yesPrice={yesPrice} tradable={data.tradable} lean={s.side} onDone={reload} />
         </aside>
       </div>
