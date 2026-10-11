@@ -31,6 +31,7 @@ export interface Order {
   }>;
   payer?: { payer_id?: string; email_address?: string };
 }
+export interface Subscription { id: string; status: 'APPROVAL_PENDING' | 'APPROVED' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' | 'EXPIRED'; plan_id?: string; links?: OrderLink[]; subscriber?: { email_address?: string }; billing_info?: { next_billing_time?: string } }
 export interface Refund { id: string; status: 'CANCELLED' | 'FAILED' | 'PENDING' | 'COMPLETED'; amount?: { currency_code: string; value: string } }
 
 export function client(cfg: PayPalConfig, fetchImpl: Fetch = fetch) {
@@ -81,6 +82,25 @@ export function client(cfg: PayPalConfig, fetchImpl: Fetch = fetch) {
         note_to_payer: note.slice(0, 255),
       }, `refund-${captureId}`);
     },
+    // --- Sonar Pro: Subscriptions API (product -> plan -> subscription) ---
+    createProduct: (name: string, description: string) =>
+      call<{ id: string }>('POST', '/v1/catalogs/products', { name, description, type: 'SERVICE', category: 'SOFTWARE' }, `product-${name}`),
+    createPlan(productId: string, name: string, cents: number) {
+      return call<{ id: string; status: string }>('POST', '/v1/billing/plans', {
+        product_id: productId, name, status: 'ACTIVE',
+        billing_cycles: [{ frequency: { interval_unit: 'MONTH', interval_count: 1 }, tenure_type: 'REGULAR', sequence: 1, total_cycles: 0, pricing_scheme: { fixed_price: { value: usd(cents), currency_code: 'USD' } } }],
+        payment_preferences: { auto_bill_outstanding: true, payment_failure_threshold: 1 },
+      }, `plan-${productId}-${cents}`);
+    },
+    createSubscription(planId: string, returnUrl: string, cancelUrl: string, requestId: string) {
+      return call<Subscription>('POST', '/v1/billing/subscriptions', {
+        plan_id: planId,
+        application_context: { brand_name: 'Sonar Desk', shipping_preference: 'NO_SHIPPING', user_action: 'SUBSCRIBE_NOW', return_url: returnUrl, cancel_url: cancelUrl },
+      }, requestId);
+    },
+    getSubscription: (id: string) => call<Subscription>('GET', `/v1/billing/subscriptions/${encodeURIComponent(id)}`),
+    createWebhook: (url: string, events: string[]) =>
+      call<{ id: string }>('POST', '/v1/notifications/webhooks', { url, event_types: events.map((name) => ({ name })) }),
     /** PayPal checks the signature for us; true only on SUCCESS. */
     async verifyWebhook(headers: Headers, rawBody: string): Promise<boolean> {
       if (!cfg.webhookId) return false;

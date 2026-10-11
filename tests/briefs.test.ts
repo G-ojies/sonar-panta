@@ -56,7 +56,7 @@ test('guarantee: nothing happens before payment, before settlement, or without a
 
 test('ledger: hit rate and refunded money', () => {
   const s = ledgerStats([paid('YES', { status: 'kept' }), paid('NO', { status: 'refunded' }), paid('YES'), paid('YES', { status: 'pending' })]);
-  assert.deepEqual(s, { sold: 3, open: 1, right: 1, refunded: 1, refundedCents: 199, keptCents: 199, hitRate: 0.5 });
+  assert.deepEqual(s, { sold: 3, open: 1, right: 1, refunded: 1, missed: 0, refundedCents: 199, keptCents: 199, hitRate: 0.5 });
 });
 
 const cfg: PayPalConfig = { clientId: 'id', clientSecret: 'secret', env: 'sandbox' };
@@ -107,4 +107,13 @@ test('paypal: helpers', () => {
   assert.equal(usd(5), '0.05');
   assert.equal(firstCapture({ id: 'O', status: 'COMPLETED', purchase_units: [{ payments: { captures: [{ id: 'C9', status: 'COMPLETED', amount: { currency_code: 'USD', value: '1.99' } }] } }] })?.id, 'C9');
   assert.equal(firstCapture({ id: 'O', status: 'CREATED' }), null);
+});
+
+test('guarantee: a Sonar Pro brief has nothing to refund, so a wrong call is recorded as missed', () => {
+  const yesWon = market(0, { onChain: { isResolved: true, yesWins: true } } as never);
+  const pro = (side: 'YES' | 'NO') => paid(side, { via: 'pro', subscriptionId: 'I-1', captureId: undefined, priceCents: 0 });
+  assert.equal(guarantee(pro('YES'), yesWon).kind, 'keep');
+  assert.equal(guarantee(pro('NO'), yesWon).kind, 'miss');
+  assert.equal(guarantee(pro('NO'), market()).kind, 'wait');
+  assert.equal(ledgerStats([{ ...pro('NO'), status: 'missed' }, { ...pro('YES'), status: 'kept' }]).hitRate, 0.5);
 });

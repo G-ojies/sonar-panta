@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { Masthead, Strip } from './Desk';
 import { postJson, useApi } from './useApi';
+import { getPro, setPro } from './pro';
 
 /** Sonar Desk: the shopping agent, the purchases waiting for PayPal approval, and the guarantee's public record. */
 
@@ -11,7 +12,7 @@ interface Step { tool: string; args: unknown; result: unknown }
 interface Reply { text: string; steps: Step[]; approvals: Approval[]; spentCents: number; budgetCents: number }
 interface Msg { role: 'user' | 'assistant'; content: string; steps?: Step[] }
 interface Ledger {
-  stats: { sold: number; open: number; right: number; refunded: number; refundedCents: number; keptCents: number; hitRate: number | null };
+  stats: { sold: number; open: number; right: number; refunded: number; missed?: number; refundedCents: number; keptCents: number; hitRate: number | null };
   settled: Array<{ id: string; marketId: string; title: string; side: string; outcome?: string; status: string; via: string }>;
 }
 
@@ -134,11 +135,13 @@ export function DeskView() {
             ))}
           </section>
 
+          <ProCard />
+
           {ledger && ledger.settled.length > 0 && (
             <section className="card space-y-1.5 p-5 text-xs">
               <h2 className="text-sm font-semibold">Guarantee record</h2>
               {ledger.settled.slice(0, 8).map((b) => (
-                <p key={b.id} className="text-fog"><span className={b.status === 'kept' ? 'text-yes' : 'text-amber'}>{b.status === 'kept' ? 'right' : 'refunded'}</span> · called {b.side}, resolved {b.outcome} · {b.title}</p>
+                <p key={b.id} className="text-fog"><span className={b.status === 'kept' ? 'text-yes' : 'text-amber'}>{b.status === 'kept' ? 'right' : b.status === 'missed' ? 'missed (Pro)' : 'refunded'}</span> · called {b.side}, resolved {b.outcome} · {b.title}</p>
               ))}
             </section>
           )}
@@ -151,4 +154,34 @@ export function DeskView() {
 function refusal(st: Step) {
   const r = st.result as { refused?: string } | null;
   return r && typeof r === 'object' && r.refused ? ` (refused: ${r.refused})` : '';
+}
+
+/** Sonar Pro: $7.99 a month through PayPal Subscriptions, every brief included. */
+function ProCard() {
+  const [sub, setSub] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    const id = getPro(); setSub(id);
+    if (!id) return;
+    fetch(`/api/pay/subscription?id=${encodeURIComponent(id)}`).then((r) => r.json()).then((j) => { setStatus(j.status ?? null); if (j.active === false && j.status && j.status !== 'APPROVED') { setPro(null); setSub(null); } }).catch(() => {});
+  }, []);
+  async function start() {
+    setBusy(true); setErr(null);
+    try { const r = await postJson<{ approveUrl: string | null }>('/api/pay/subscribe', {}); if (r.approveUrl) window.location.href = r.approveUrl; else throw new Error('PayPal did not return an approval link'); }
+    catch (e) { setErr((e as Error).message); setBusy(false); }
+  }
+  return (
+    <section id="pro" className="card space-y-2 p-5 text-sm">
+      <div className="flex items-baseline justify-between"><h2 className="font-semibold">Sonar Pro</h2><span className="mono text-xs text-fog">$7.99 / month</span></div>
+      {sub && status === 'ACTIVE'
+        ? <p className="text-xs text-ping">Active. Every brief is included; manage or cancel it in your PayPal account.</p>
+        : <>
+            <p className="text-xs text-fog">Every brief on every market, no checkout per brief. Billed monthly by PayPal; cancel any time.</p>
+            <button className="btn btn-primary w-full" disabled={busy} onClick={() => void start()}>Subscribe with PayPal</button>
+          </>}
+      {err && <p className="text-xs text-no">{err}</p>}
+    </section>
+  );
 }

@@ -8,7 +8,8 @@ import type { MarketDetail, RadarMarket } from './types';
 
 export const BRIEF_PRICE_CENTS = 199;
 
-export type BriefStatus = 'pending' | 'paid' | 'refunded' | 'kept';
+/** 'missed' is a wrong call on a Sonar Pro brief: the subscription paid for it, so there is no single payment to refund. */
+export type BriefStatus = 'pending' | 'paid' | 'refunded' | 'kept' | 'missed';
 export interface Brief {
   id: string;
   marketId: string;
@@ -27,7 +28,9 @@ export interface Brief {
   refundId?: string;
   settledAt?: number;
   /** 'agent' when the shopping agent created the order; a person still approves it */
-  via: 'button' | 'agent';
+  via: 'button' | 'agent' | 'pro';
+  /** Sonar Pro subscription that covered it (priceCents 0, no capture) */
+  subscriptionId?: string;
   /** the shopping-agent session that created it, for the session budget */
   session?: string;
 }
@@ -55,13 +58,15 @@ export function outcomeOf(d: MarketDetail): Brief['outcome'] | null {
   return yes === 1 ? 'YES' : 'NO';
 }
 
-export type GuaranteeAction = { kind: 'refund'; brief: Brief; note: string } | { kind: 'keep'; brief: Brief } | { kind: 'wait'; brief: Brief };
+export type GuaranteeAction = { kind: 'refund'; brief: Brief; note: string } | { kind: 'keep'; brief: Brief } | { kind: 'miss'; brief: Brief } | { kind: 'wait'; brief: Brief };
 
 /** What the guarantee does with one paid brief, given the market's current detail. */
 export function guarantee(b: Brief, d: MarketDetail | null): GuaranteeAction {
-  if (b.status !== 'paid' || !b.captureId || !d) return { kind: 'wait', brief: b };
+  const pro = b.via === 'pro' && !!b.subscriptionId;
+  if (b.status !== 'paid' || (!b.captureId && !pro) || !d) return { kind: 'wait', brief: b };
   const o = outcomeOf(d);
   if (!o) return { kind: 'wait', brief: b };
+  if (pro) return o === b.call.side ? { kind: 'keep', brief: { ...b, outcome: o } } : { kind: 'miss', brief: { ...b, outcome: o } };
   if (o === 'CANCELLED') return { kind: 'refund', brief: { ...b, outcome: o }, note: `Sonar Desk: "${b.title.slice(0, 120)}" was cancelled, so your brief is refunded.` };
   if (o !== b.call.side) return { kind: 'refund', brief: { ...b, outcome: o }, note: `Sonar Desk called ${b.call.side} on "${b.title.slice(0, 120)}" and it resolved ${o}. Wrong call, full refund.` };
   return { kind: 'keep', brief: { ...b, outcome: o } };
@@ -69,7 +74,7 @@ export function guarantee(b: Brief, d: MarketDetail | null): GuaranteeAction {
 
 /** The guarantee's public record: how many paid briefs were right, and how much went back to buyers. */
 export function ledgerStats(briefs: Brief[]) {
-  const settled = briefs.filter((b) => b.status === 'refunded' || b.status === 'kept');
+  const settled = briefs.filter((b) => b.status === 'refunded' || b.status === 'kept' || b.status === 'missed');
   const refunded = settled.filter((b) => b.status === 'refunded');
   const kept = settled.filter((b) => b.status === 'kept');
   const sum = (xs: Brief[]) => xs.reduce((a, b) => a + b.priceCents, 0);
@@ -78,6 +83,7 @@ export function ledgerStats(briefs: Brief[]) {
     open: briefs.filter((b) => b.status === 'paid').length,
     right: kept.length,
     refunded: refunded.length,
+    missed: settled.filter((b) => b.status === 'missed').length,
     refundedCents: sum(refunded),
     keptCents: sum(kept),
     hitRate: settled.length ? kept.length / settled.length : null,

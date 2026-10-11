@@ -2,11 +2,12 @@
 import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import type { SignalSet } from '@/lib/types';
 import { postJson } from './useApi';
+import { getPro, setPro } from './pro';
 
 /** Sonar Desk: buy the brief behind Sonar's call with PayPal (JS SDK v6). Refunded automatically if the call is wrong. */
 
 interface BriefText { headline: string; body: string[]; risks: string[]; via: 'groq' | 'template' }
-interface BriefRow { id: string; status: 'pending' | 'paid' | 'refunded' | 'kept'; call: { side: 'YES' | 'NO'; score: number }; outcome?: string; refundId?: string }
+interface BriefRow { id: string; status: 'pending' | 'paid' | 'refunded' | 'kept' | 'missed'; call: { side: 'YES' | 'NO'; score: number }; outcome?: string; refundId?: string; via?: string }
 interface OrderRes { orderId: string; approveUrl: string | null; briefId: string; priceCents: number }
 
 interface V6Session { start(opts: { presentationMode: 'auto' | 'popup' | 'modal' | 'redirect' }, order: Promise<{ orderId: string }>): Promise<void> }
@@ -88,6 +89,21 @@ export function BriefPanel({ marketId, side, closed }: { marketId: string; side:
     return { orderId: r.orderId };
   }, [marketId]);
 
+  const [pro, setProId] = useState<string | null>(null);
+  useEffect(() => { setProId(getPro()); }, []);
+
+  const readWithPro = useCallback(async (sub: string) => {
+    setErr(null); setBusy(true);
+    try {
+      const r = await postJson<{ orderId: string; brief: BriefRow; text: BriefText }>('/api/pay/order', { marketId, subscriptionId: sub });
+      setBrief(r.brief); setText(r.text); remember(marketId, r.orderId);
+    } catch (e) {
+      const m = (e as Error).message;
+      if (/PRO_INACTIVE/.test(m)) { setPro(null); setProId(null); }
+      setErr(m);
+    } finally { setBusy(false); }
+  }, [marketId]);
+
   const pay = useCallback(async () => {
     setErr(null); setBusy(true);
     try {
@@ -120,9 +136,10 @@ export function BriefPanel({ marketId, side, closed }: { marketId: string; side:
           <ul className="space-y-1.5 text-fog">{text.body.map((b, i) => <li key={i}>{b}</li>)}</ul>
           <div className="border-t border-line pt-2 text-xs text-fog-2">{text.risks.map((r, i) => <p key={i}>{r}</p>)}</div>
           <p className="text-xs">
-            {brief.status === 'paid' && <span className="text-ping">Guarantee open: refunded through PayPal if the market resolves against {brief.call.side}.</span>}
+            {brief.status === 'paid' && (brief.via === 'pro' ? <span className="text-ping">Included in Sonar Pro.</span> : <span className="text-ping">Guarantee open: refunded through PayPal if the market resolves against {brief.call.side}.</span>)}
             {brief.status === 'kept' && <span className="text-yes">Call was right ({brief.outcome}).</span>}
             {brief.status === 'refunded' && <span className="text-amber">Call was wrong ({brief.outcome}); refunded to your PayPal.</span>}
+            {brief.status === 'missed' && <span className="text-amber">Call was wrong ({brief.outcome}). Covered by Sonar Pro.</span>}
           </p>
           <p className="text-[11px] text-fog-2">Written by {text.via === 'groq' ? 'gpt-oss on Groq from Sonar’s own numbers' : 'Sonar’s template'}.</p>
         </div>
@@ -131,6 +148,8 @@ export function BriefPanel({ marketId, side, closed }: { marketId: string; side:
       ) : (
         <div className="mt-3 space-y-3 text-sm">
           <p className="text-fog">Sonar leans <strong className={side === 'YES' ? 'text-yes' : 'text-no'}>{side}</strong>. The brief explains why, from the tape, the price path and other venues. <span className="text-paper">If the call is wrong when the market resolves, you get the $1.99 back automatically.</span></p>
+          {pro && <button className="btn btn-primary w-full" disabled={busy} onClick={() => void readWithPro(pro)}>Read it with Sonar Pro</button>}
+          {!pro && <p className="text-[11px] text-fog-2">Or get every brief with <a href="/desk#pro">Sonar Pro</a>, $7.99 a month.</p>}
           {session
             ? createElement('paypal-button', { ref: btnRef, type: 'pay', class: busy ? 'opacity-60' : '' })
             : <button className="btn w-full" onClick={() => void pay()} disabled={busy || !CLIENT_ID}>{CLIENT_ID ? 'Buy with PayPal' : 'PayPal not configured'}</button>}
