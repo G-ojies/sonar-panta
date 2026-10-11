@@ -16,6 +16,7 @@ const K = {
   list: 'desk:briefs',
   session: (s: string) => `desk:session:${s}`,
   pro: (id: string) => `desk:pro:${id}`,
+  sweptAt: 'desk:swept-at',
 };
 
 export function paypal(): PayPalClient {
@@ -201,3 +202,11 @@ export async function onPayPalEvent(ev: { event_type?: string; resource?: Record
 }
 
 export const WEBHOOK_EVENTS = ['CHECKOUT.ORDER.APPROVED', 'PAYMENT.CAPTURE.COMPLETED', 'PAYMENT.CAPTURE.REFUNDED', 'BILLING.SUBSCRIPTION.ACTIVATED', 'BILLING.SUBSCRIPTION.CANCELLED', 'BILLING.SUBSCRIPTION.SUSPENDED', 'BILLING.SUBSCRIPTION.EXPIRED'];
+
+/** Run the guarantee sweep at most once an hour, from whatever request comes in (no cron needed on this service). */
+export async function sweepIfDue(everySec = 3600) {
+  const last = (await store().get<number>(K.sweptAt)) ?? 0;
+  if (Date.now() / 1000 - last < everySec || !paypalConfig()) return null;
+  await store().set(K.sweptAt, Date.now() / 1000);
+  return sweepGuarantee();
+}
