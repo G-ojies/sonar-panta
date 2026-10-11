@@ -40,7 +40,7 @@ export async function runShopper(opts: { session: string; mandate: Mandate; mess
   const tools = {
     find_calls: tool({
       description: "List open markets where Sonar has a call that fits the user's mandate, strongest first.",
-      parameters: z.object({ category: z.string().optional().describe('optional narrower category, e.g. crypto, sports') }),
+      parameters: z.object({ category: z.string().nullish().describe('optional narrower category, e.g. crypto, sports') }),
       execute: async ({ category }) => {
         const m = category ? { ...opts.mandate, categories: [category.toLowerCase()] } : opts.mandate;
         const allowedCats = opts.mandate.categories;
