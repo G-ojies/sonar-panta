@@ -34,7 +34,8 @@ project at github.com/G-ojies/sonar-panta). The pipeline is `.gitlab-ci.yml`; th
      RPCFAST_API_KEY (public RPC is enough).
    - Settings > Deploy Hook: copy the URL.
 5. **CI/CD variables** (Settings > CI/CD > Variables, all protected; mask the hook):
-   - `RENDER_DEPLOY_HOOK_URL`: the deploy hook (masked).
+   - `RENDER_SERVICE_ID`: the `srv-...` part of the deploy hook.
+   - `RENDER_DEPLOY_KEY`: the `key=` part of the deploy hook (masked; GitLab cannot mask the whole URL because of the `?`).
    - `GUARD_BASE_URL`: the service URL, for example `https://sonar-guard.onrender.com`.
 6. **Environment.** Operate > Environments > production. Settings > CI/CD > Protected environments: protect
    production; the deploy is allowed for maintainers only.

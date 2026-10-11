@@ -136,8 +136,9 @@ dependency_scanning:
 
 # ---------------------------------------------------------------- deploy
 
-# Render builds from this commit when the hook is called. RENDER_DEPLOY_HOOK_URL is a masked, protected
-# CI variable; the production environment is protected (docs/GITLAB.md), so only the default branch can use it.
+# Render builds this project's main when its deploy hook is called. The hook is split in two CI variables because
+# GitLab cannot mask a URL with "?": RENDER_SERVICE_ID (plain) and RENDER_DEPLOY_KEY (masked, protected, so only the
+# default branch can use it). Render builds this public repo, so the deploy is the commit this pipeline tested.
 deploy:production:
   stage: deploy
   extends: .main
@@ -148,8 +149,8 @@ deploy:production:
     url: $GUARD_BASE_URL
   resource_group: production
   script:
-    - test -n "$RENDER_DEPLOY_HOOK_URL" || { echo "RENDER_DEPLOY_HOOK_URL is not set"; exit 1; }
-    - curl -fsS -X POST "${RENDER_DEPLOY_HOOK_URL}&ref=${CI_COMMIT_SHA}" -o deploy.json
+    - test -n "$RENDER_SERVICE_ID" && test -n "$RENDER_DEPLOY_KEY" || { echo "RENDER_SERVICE_ID / RENDER_DEPLOY_KEY are not set"; exit 1; }
+    - curl -fsS -X POST "https://api.render.com/deploy/${RENDER_SERVICE_ID}?key=${RENDER_DEPLOY_KEY}&ref=${CI_COMMIT_SHA}" -o deploy.json
     - cat deploy.json
 
 # ---------------------------------------------------------------- monitor
