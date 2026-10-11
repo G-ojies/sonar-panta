@@ -8,6 +8,7 @@ const items = [
   { href: '/curve', label: 'Curve', match: (p: string) => p.startsWith('/curve') },
   { href: '/create', label: 'Create', match: (p: string) => p.startsWith('/create') },
   { href: '/agent', label: 'Agent', match: (p: string) => p.startsWith('/agent') },
+  { href: '/desk', label: 'Desk', match: (p: string) => p.startsWith('/desk') },
 ];
 
 export function Nav() {

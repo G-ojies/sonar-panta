@@ -14,6 +14,7 @@ const K = {
   byOrder: (orderId: string) => `desk:order:${orderId}`,
   text: (id: string) => `desk:text:${id}`,
   list: 'desk:briefs',
+  session: (s: string) => `desk:session:${s}`,
 };
 
 export function paypal(): PayPalClient {
@@ -36,17 +37,22 @@ export async function listBriefs(limit = 200): Promise<Brief[]> {
   return rows.filter((b): b is Brief => !!b);
 }
 
+export async function sessionBriefs(session: string): Promise<Brief[]> {
+  const ids = await store().lrange<string>(K.session(session), 0, 99);
+  return (await store().mget<Brief>(ids.map(K.brief))).filter((b): b is Brief => !!b);
+}
+
 /** Step 1: freeze Sonar's call and open a PayPal order for it. The buyer approves it in PayPal. */
-export async function openBrief(marketId: string, via: Brief['via'] = 'button', pp: PayPalClient = paypal(), m?: RadarMarket | null) {
+export async function openBrief(marketId: string, via: Brief['via'] = 'button', pp: PayPalClient = paypal(), m?: RadarMarket | null, opts: { session?: string; returnUrl?: string } = {}) {
   const market = m === undefined ? await readMarket(marketId) : m;
   const ok = sellable(market);
   if (!ok.ok) throw new PayPalError(409, 'NOT_SELLABLE', ok.reason);
   const mk = market!;
   const id = randomUUID();
   const title = mk.detail.title || mk.detail.question || marketId;
-  const order = await pp.createOrder({ referenceId: marketId.slice(0, 256), customId: `brief:${id}`, description: `Sonar brief: ${title}`, cents: BRIEF_PRICE_CENTS, requestId: `brief-${id}` });
-  const b: Brief = { id, marketId, title, call: freezeCall(mk), priceCents: BRIEF_PRICE_CENTS, orderId: order.id, createdAt: Date.now() / 1000, status: 'pending', via };
-  await Promise.all([saveBrief(b), store().set(K.byOrder(order.id), id), store().lpush(K.list, id, 5000)]);
+  const order = await pp.createOrder({ referenceId: marketId.slice(0, 256), customId: `brief:${id}`, description: `Sonar brief: ${title}`, cents: BRIEF_PRICE_CENTS, requestId: `brief-${id}`, returnUrl: opts.returnUrl, cancelUrl: opts.returnUrl ? `${opts.returnUrl}${opts.returnUrl.includes('?') ? '&' : '?'}cancelled=1` : undefined });
+  const b: Brief = { id, marketId, title, call: freezeCall(mk), priceCents: BRIEF_PRICE_CENTS, orderId: order.id, createdAt: Date.now() / 1000, status: 'pending', via, ...(opts.session ? { session: opts.session } : {}) };
+  await Promise.all([saveBrief(b), store().set(K.byOrder(order.id), id), store().lpush(K.list, id, 5000), ...(opts.session ? [store().lpush(K.session(opts.session), id, 100)] : [])]);
   return { brief: b, orderId: order.id, approveUrl: approveUrl(order) };
 }
 
@@ -98,9 +104,9 @@ export async function writeBrief(b: Brief, m: RadarMarket | null, fetchImpl: typ
     const res = await fetchImpl('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.GROQ_MODEL ?? 'llama-3.3-70b-versatile', temperature: 0.2, response_format: { type: 'json_object' },
+        model: process.env.GROQ_MODEL ?? 'openai/gpt-oss-120b', temperature: 0.2, response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: 'You write short trading briefs for one prediction market. Use only the JSON facts given; never invent numbers, news or sources. Plain English, no hype, no financial advice. Return JSON: {"headline": string, "body": string[3-5], "risks": string[2-3]}.' },
+          { role: 'system', content: 'You write short trading briefs for one prediction market. Use only the JSON facts given; never invent numbers, news or sources. Plain English for a newcomer, no hype, no financial advice. Write fractions as percentages and durations in minutes, hours or days; never print raw field names (say \"one wallet holds 48% of the volume\", not \"concentration 0.479\"). Return JSON: {"headline": string, "body": string[3-5], "risks": string[2-3]}.' },
           { role: 'user', content: JSON.stringify(facts) },
         ],
       }),

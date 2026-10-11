@@ -28,6 +28,8 @@ export interface Brief {
   settledAt?: number;
   /** 'agent' when the shopping agent created the order; a person still approves it */
   via: 'button' | 'agent';
+  /** the shopping-agent session that created it, for the session budget */
+  session?: string;
 }
 
 /** Sonar only sells a brief when it has a side; a FLAT market has nothing to guarantee. */

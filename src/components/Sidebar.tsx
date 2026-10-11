@@ -9,6 +9,7 @@ const nav = [
   { href: '/curve', label: 'Curve', icon: 'M4 18c6 0 10-2 12-8 1-3 2-4 4-4', match: (p: string) => p.startsWith('/curve') },
   { href: '/create', label: 'Create', icon: 'M12 5v14M5 12h14', match: (p: string) => p.startsWith('/create') },
   { href: '/agent', label: 'Agent', icon: 'M5 19l4-9 3 6 3-12 4 15', match: (p: string) => p.startsWith('/agent') },
+  { href: '/desk', label: 'Desk', icon: 'M4 7h16v10H4zM8 7V5h8v2M4 12h16', match: (p: string) => p.startsWith('/desk') },
 ];
 
 export interface Topic { key: string; label: string; count: number }

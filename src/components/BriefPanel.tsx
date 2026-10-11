@@ -124,7 +124,7 @@ export function BriefPanel({ marketId, side, closed }: { marketId: string; side:
             {brief.status === 'kept' && <span className="text-yes">Call was right ({brief.outcome}).</span>}
             {brief.status === 'refunded' && <span className="text-amber">Call was wrong ({brief.outcome}); refunded to your PayPal.</span>}
           </p>
-          <p className="text-[11px] text-fog-2">Written by {text.via === 'groq' ? 'Llama on Groq from Sonar’s own numbers' : 'Sonar’s template'}.</p>
+          <p className="text-[11px] text-fog-2">Written by {text.via === 'groq' ? 'gpt-oss on Groq from Sonar’s own numbers' : 'Sonar’s template'}.</p>
         </div>
       ) : closed ? (
         <p className="mt-3 text-sm text-fog">This market has closed, so new briefs are not sold.</p>

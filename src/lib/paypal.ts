@@ -66,11 +66,11 @@ export function client(cfg: PayPalConfig, fetchImpl: Fetch = fetch) {
   return {
     token,
     /** One brief for one market. The price comes from the server, never from the browser. */
-    createOrder(o: { referenceId: string; customId: string; description: string; cents: number; requestId: string }) {
+    createOrder(o: { referenceId: string; customId: string; description: string; cents: number; requestId: string; returnUrl?: string; cancelUrl?: string }) {
       return call<Order>('POST', '/v2/checkout/orders', {
         intent: 'CAPTURE',
         purchase_units: [{ reference_id: o.referenceId, custom_id: o.customId.slice(0, 127), description: o.description.slice(0, 127), amount: { currency_code: 'USD', value: usd(o.cents) } }],
-        payment_source: { paypal: { experience_context: { brand_name: 'Sonar Desk', shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW' } } },
+        payment_source: { paypal: { experience_context: { brand_name: 'Sonar Desk', shipping_preference: 'NO_SHIPPING', user_action: 'PAY_NOW', ...(o.returnUrl ? { return_url: o.returnUrl, cancel_url: o.cancelUrl ?? o.returnUrl } : {}) } } },
       }, o.requestId);
     },
     getOrder: (id: string) => call<Order>('GET', `/v2/checkout/orders/${encodeURIComponent(id)}`),
