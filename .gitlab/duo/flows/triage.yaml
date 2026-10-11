@@ -4,48 +4,29 @@
 # here with a note: program changes are written and approved by a person.
 version: "v1"
 environment: ambient
-name: "Sonar Triage"
-description: "Classify a new Sonar issue, add acceptance criteria and labels, and open an MR for low-risk web changes."
 
 components:
   - name: "triage"
     type: AgentComponent
     prompt_id: "triage_prompt"
-    response_schema_id: "triage_result"
     inputs:
       - from: "context:goal"
         as: "event"
       - from: "context:project_id"
         as: "project_id"
     toolset: ["get_work_item", "get_issue", "list_issues", "read_file", "find_files", "grep", "update_issue", "create_issue_note"]
-    max_cycles: 40
     ui_log_events: ["on_agent_final_answer", "on_tool_execution_success", "on_tool_execution_failed"]
 
   - name: "builder"
     type: AgentComponent
     prompt_id: "builder_prompt"
     inputs:
-      - from: "context:triage.final_answer"
-        as: "plan"
+      - from: "context:goal"
+        as: "event"
       - from: "context:project_id"
         as: "project_id"
     toolset: ["read_file", "read_files", "find_files", "grep", "list_dir", "edit_file", "create_file_with_contents", "run_command", "run_git_command", "create_merge_request", "create_issue_note"]
-    max_cycles: 120
     ui_log_events: ["on_agent_final_answer", "on_tool_execution_success", "on_tool_execution_failed"]
-
-response_schemas:
-  - schema_id: "triage_result"
-    definition:
-      type: object
-      properties:
-        issue_iid: { type: integer }
-        area: { type: string, enum: ["web", "data", "onchain", "docs", "unclear"] }
-        risk: { type: string, enum: ["low", "medium", "high"] }
-        route: { type: string, enum: ["build", "human"], description: "build only when area is web or docs AND risk is low" }
-        acceptance_criteria: { type: array, items: { type: string } }
-        files_likely: { type: array, items: { type: string } }
-        summary: { type: string }
-      required: [issue_iid, area, risk, route, acceptance_criteria, summary]
 
 prompts:
   - prompt_id: "triage_prompt"
@@ -64,6 +45,7 @@ prompts:
         4. Post one comment on the issue with the area, risk, 3 to 6 testable acceptance criteria and the files
            likely to change. Add the labels area::<area> and risk::<risk>. If route is human, say a person picks it up.
         Never ask questions: nobody is there to answer. Never touch secrets or CI variables.
+        Your final answer must be exactly one word, build or human, with nothing else: the flow routes on it.
       user: |
         Project id: {{project_id}}
         Event: {{event}}
@@ -76,6 +58,7 @@ prompts:
     prompt_template:
       system: |
         You implement a small, low-risk change to the Sonar web app that triage has already scoped.
+        Read the issue from the event, and triage's comment on it (area, risk, acceptance criteria, files).
         Rules:
         - Work on a new branch named guard/issue-<iid>. Never commit to the default branch.
         - Never edit anything under onchain/, .gitlab-ci.yml, .gitlab/ or any file with secrets. If the change
@@ -86,14 +69,14 @@ prompts:
           criterion is met. Then comment the MR link on the issue.
       user: |
         Project id: {{project_id}}
-        Triage result: {{plan}}
+        Event: {{event}}
     params:
       timeout: 600
 
 routers:
   - from: "triage"
     condition:
-      input: "context:triage.final_answer.route"
+      input: "context:triage.final_answer"
       routes:
         "build": "builder"
         "default_route": "end"

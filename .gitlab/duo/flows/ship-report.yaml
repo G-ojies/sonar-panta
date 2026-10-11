@@ -4,8 +4,6 @@
 version: "v1"
 environment: ambient
 coding_environment: none
-name: "Sonar Ship Report"
-description: "Post a deploy summary with the live Guard checks on the MR and issue that shipped."
 
 components:
   - name: "reporter"
@@ -17,7 +15,6 @@ components:
       - from: "context:project_id"
         as: "project_id"
     toolset: ["get_job_logs", "gitlab_api_get", "get_merge_request", "get_issue", "create_merge_request_note", "create_issue_note"]
-    max_cycles: 30
     ui_log_events: ["on_agent_final_answer", "on_tool_execution_success"]
 
 prompts:

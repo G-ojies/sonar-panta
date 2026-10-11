@@ -4,8 +4,6 @@
 # Non-program MRs get a one-line note and the foundational Code Review flow does the general review.
 version: "v1"
 environment: ambient
-name: "Sonar Anchor Review"
-description: "Review curve_market changes against the program's threat model and invariants."
 
 components:
   - name: "anchor_reviewer"
@@ -17,7 +15,6 @@ components:
       - from: "context:project_id"
         as: "project_id"
     toolset: ["get_merge_request", "list_merge_request_diffs", "build_review_merge_request_context", "read_file", "read_files", "grep", "find_files", "create_merge_request_diff_note", "create_merge_request_note", "update_merge_request"]
-    max_cycles: 80
     ui_log_events: ["on_agent_final_answer", "on_tool_execution_success", "on_tool_execution_failed"]
 
 prompts:
