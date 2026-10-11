@@ -39,7 +39,7 @@ project at github.com/G-ojies/sonar-panta). The pipeline is `.gitlab-ci.yml`; th
    - `GUARD_BASE_URL`: the service URL, for example `https://sonar-guard.onrender.com`.
 6. **Environment.** Operate > Environments > production. Settings > CI/CD > Protected environments: protect
    production; the deploy is allowed for maintainers only.
-7. **Schedule.** Build > Pipeline schedules > New: every 3 hours, target main, variable `GUARD_SCHEDULE=monitor`.
+7. **Schedule.** Build > Pipeline schedules > New: every 3 hours (`17 */3 * * *`), target main. No variable needed.
 8. **Flows.** AI > Flows > New flow, once for each file in `.gitlab/duo/flows/` (paste the YAML, visibility
    Private). Enable each with its trigger:
 

@@ -179,11 +179,11 @@ monitor:post-deploy:
     name: production
     action: verify
 
-# Set up as a pipeline schedule with GUARD_SCHEDULE=monitor (every 3 hours). Runs only this job.
+# Set up as a pipeline schedule on main (every 3 hours). Runs only this job: every other job skips schedules.
 monitor:scheduled:
   extends: .guard
   rules:
-    - if: $CI_PIPELINE_SOURCE == "schedule" && $GUARD_SCHEDULE == "monitor"
+    - if: $CI_PIPELINE_SOURCE == "schedule"
   variables:
     GUARD_BASELINE_JOB: monitor:post-deploy
 
