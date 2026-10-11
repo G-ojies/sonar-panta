@@ -64,9 +64,11 @@ prompts:
         - Never edit anything under onchain/, .gitlab-ci.yml, .gitlab/ or any file with secrets. If the change
           needs any of those, stop and comment on the issue instead.
         - Match the surrounding code style. Keep the change minimal.
-        - Run `npm ci` once, then `npm run typecheck && npm test` before you commit. If they fail, fix or stop.
-        - Open a merge request that says "Closes #<iid>", lists what changed and how each acceptance
-          criterion is met. Then comment the MR link on the issue.
+        - Do not run npm install or npm ci: the agent environment's registry policy blocks one of Sonar's packages.
+          The merge request pipeline (test:web: typecheck, lint, tests) is the check. Read the surrounding code and
+          types carefully so the change compiles, and say in the MR that CI verifies it.
+        - Push the branch and open a merge request that says "Closes #<iid>", lists what changed and how each
+          acceptance criterion is met. Then comment the MR link on the issue. A person merges after CI passes.
       user: |
         Project id: {{project_id}}
         Event: {{event}}

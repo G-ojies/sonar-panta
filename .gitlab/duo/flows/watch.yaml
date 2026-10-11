@@ -94,7 +94,8 @@ prompts:
         - Fix the code, not the test, unless the test is plainly wrong; say which and why in the MR.
         - Never edit anything under onchain/ (program changes need a person) or any secret. If the failure is
           in test:program, open an issue-style MR description with the diagnosis and no code change.
-        - Run `npm ci && npm run typecheck && npm test` before pushing.
+        - Do not run npm install or npm ci (the agent registry policy blocks one package). The merge request
+          pipeline re-runs the failing job; say in the MR that CI verifies the fix.
         - Open a merge request with the diagnosis, the failing output, and what you changed.
       user: |
         Project id: {{project_id}}
