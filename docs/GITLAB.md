@@ -22,7 +22,7 @@ project at github.com/G-ojies/sonar-panta). The pipeline is `.gitlab-ci.yml`; th
 
 1. **Import.** In the hackathon group: New project > Import project > Repository by URL >
    `https://github.com/G-ojies/sonar-panta.git`. Public visibility. Check the MIT license shows in the About panel.
-2. **CODEOWNERS.** Replace `@OWNER` in `.gitlab/CODEOWNERS` with the GitLab username.
+2. **CODEOWNERS.** Already set to `@G-ojies` in `.gitlab/CODEOWNERS`.
 3. **Protected branch.** Settings > Repository > Protected branches > main: allowed to push = no one
    (merge only), and turn on "Require approval from code owners".
 4. **Render service** (a second free web service, separate from sonarpanta.xyz):
