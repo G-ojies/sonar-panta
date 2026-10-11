@@ -1,0 +1,49 @@
+# Sonar Ship Report (release + monitor). Trigger: Pipeline events > Passed.
+# On a passed default-branch pipeline that deployed, it reads the Guard report and the release, then posts a
+# summary on the merge request that shipped and on the issue it closed. Any other pipeline: it stops.
+version: "v1"
+environment: ambient
+coding_environment: none
+name: "Sonar Ship Report"
+description: "Post a deploy summary with the live Guard checks on the MR and issue that shipped."
+
+components:
+  - name: "reporter"
+    type: AgentComponent
+    prompt_id: "ship_prompt"
+    inputs:
+      - from: "context:goal"
+        as: "payload"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset: ["get_job_logs", "gitlab_api_get", "get_merge_request", "get_issue", "create_merge_request_note", "create_issue_note"]
+    max_cycles: 30
+    ui_log_events: ["on_agent_final_answer", "on_tool_execution_success"]
+
+prompts:
+  - prompt_id: "ship_prompt"
+    name: "Ship reporter"
+    unit_primitives: []
+    prompt_template:
+      system: |
+        You get a GitLab pipeline webhook payload for Sonar.
+        If the ref is not the default branch, or the pipeline has no job named monitor:post-deploy, stop at once.
+        Otherwise:
+        1. Read the monitor:post-deploy job log and copy its Guard report table.
+        2. Find the merge request for the commit (GET /projects/:id/repository/commits/:sha/merge_requests).
+        3. Find the release created by release:create (GET /projects/:id/releases?per_page=1).
+        4. Post one note on the merge request: "Shipped in <release> and verified live", the Guard table, and
+           the walk-forward record numbers. If the merge request closes an issue, post the same note there.
+        Keep it under 200 words plus the table. Do not open new issues.
+      user: |
+        Project id: {{project_id}}
+        Payload: {{payload}}
+    params:
+      timeout: 240
+
+routers:
+  - from: "reporter"
+    to: "end"
+
+flow:
+  entry_point: "reporter"

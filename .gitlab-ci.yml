@@ -1,0 +1,217 @@
+# Sonar Guard: the post-code lifecycle for Sonar for Panta on GitLab.
+#
+#   test     typecheck, lint, the TS test suite; the curve_market program build and its LiteSVM tests
+#   package  container image to the GitLab registry; curve_market.so + SHA-256 to the package registry
+#   secure   SAST, secret detection, dependency scanning (GitLab templates)
+#   deploy   Render deploy hook for the production environment (default branch only)
+#   monitor  Sonar Guard checks against the live site: the deployed commit, health, radar freshness, the walk-forward record
+#   release  a GitLab Release, only after the live checks pass
+#
+# Agents (GitLab Duo flows in .gitlab/duo/flows) react to what this pipeline does: Watch on a failed
+# pipeline, Ship report on a passed one. No job here, and no agent, can deploy or upgrade the on-chain
+# program: its upgrade authority never enters CI. See docs/GITLAB.md.
+#
+# The data tick (sonar-tick) stays on GitHub Actions on purpose: two schedulers writing to the same
+# Upstash database is how its bandwidth ran out on 6 Oct 2026.
+
+stages: [test, package, secure, deploy, monitor, release]
+
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+
+variables:
+  SOLANA_VERSION: v3.1.14
+  NODE_IMAGE: node:20-bookworm
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_PIPELINE_SOURCE == "web"
+
+# Code jobs skip the scheduled monitor-only pipeline.
+.code:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - when: on_success
+
+.main:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.onchain:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - changes: [onchain/**/*]
+
+.npm:
+  image: $NODE_IMAGE
+  cache:
+    key: { files: [package-lock.json] }
+    paths: [.npm/]
+  before_script:
+    - npm ci --cache .npm --prefer-offline --no-audit --no-fund
+
+# ---------------------------------------------------------------- test
+
+test:web:
+  stage: test
+  extends: [.npm, .code]
+  script:
+    - npm run typecheck
+    - npm run lint
+    - npx tsx --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit.xml tests/*.test.ts
+  artifacts:
+    when: always
+    reports: { junit: junit.xml }
+
+test:program:
+  stage: test
+  extends: .onchain
+  image: rust:1-bookworm
+  timeout: 40m
+  variables:
+    CARGO_HOME: $CI_PROJECT_DIR/.cargo
+  cache:
+    key: curve-market-$SOLANA_VERSION
+    paths: [.cargo/registry, .cargo/git, onchain/target, .solana-cache]
+  script:
+    - mkdir -p .solana-cache && ln -sfn $CI_PROJECT_DIR/.solana-cache $HOME/.cache
+    - sh -c "$(curl -sSfL https://release.anza.xyz/${SOLANA_VERSION}/install)"
+    - export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+    - cd onchain
+    - cargo build-sbf
+    - cargo test 2>&1 | tee ../program-tests.txt
+    - sha256sum target/deploy/curve_market.so | tee ../curve_market.sha256
+  artifacts:
+    paths: [onchain/target/deploy/curve_market.so, curve_market.sha256, program-tests.txt]
+    expire_in: 30 days
+
+# ---------------------------------------------------------------- package
+
+package:image:
+  stage: package
+  extends: .main
+  image: docker:27
+  services: [docker:27-dind]
+  needs: [test:web]
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build --build-arg COMMIT=$CI_COMMIT_SHA -t $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA -t $CI_REGISTRY_IMAGE:latest .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
+
+package:program:
+  stage: package
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  image: curlimages/curl:8.10.1
+  needs: [test:program]
+  script:
+    - URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/curve_market/$CI_COMMIT_SHORT_SHA"
+    - 'curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file onchain/target/deploy/curve_market.so "$URL/curve_market.so"'
+    - 'curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file curve_market.sha256 "$URL/curve_market.sha256"'
+
+# ---------------------------------------------------------------- secure (GitLab templates, moved into their own stage)
+
+sast:
+  stage: secure
+secret_detection:
+  stage: secure
+dependency_scanning:
+  stage: secure
+
+# ---------------------------------------------------------------- deploy
+
+# Render builds from this commit when the hook is called. RENDER_DEPLOY_HOOK_URL is a masked, protected
+# CI variable; the production environment is protected (docs/GITLAB.md), so only the default branch can use it.
+deploy:production:
+  stage: deploy
+  extends: .main
+  image: curlimages/curl:8.10.1
+  needs: [test:web, package:image]
+  environment:
+    name: production
+    url: $GUARD_BASE_URL
+  resource_group: production
+  script:
+    - test -n "$RENDER_DEPLOY_HOOK_URL" || { echo "RENDER_DEPLOY_HOOK_URL is not set"; exit 1; }
+    - curl -fsS -X POST "${RENDER_DEPLOY_HOOK_URL}&ref=${CI_COMMIT_SHA}" -o deploy.json
+    - cat deploy.json
+
+# ---------------------------------------------------------------- monitor
+
+.guard:
+  stage: monitor
+  image: $NODE_IMAGE
+  variables:
+    GUARD_PREV: guard-prev.json
+  script:
+    # the last good report from the default branch, for the record-kept check; absent on the first run
+    - 'curl -fsS --header "JOB-TOKEN: $CI_JOB_TOKEN" -o guard-prev.json "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/artifacts/$CI_DEFAULT_BRANCH/raw/guard-report.json?job=$GUARD_BASELINE_JOB" || rm -f guard-prev.json'
+    - npx --yes tsx scripts/guard/monitor.ts
+  artifacts:
+    when: always
+    paths: [guard-report.json, guard-report.md]
+    expire_in: 90 days
+
+monitor:post-deploy:
+  extends: [.guard, .main]
+  needs: [deploy:production]
+  variables:
+    GUARD_EXPECT_COMMIT: $CI_COMMIT_SHA
+    GUARD_BASELINE_JOB: monitor:post-deploy
+  environment:
+    name: production
+    action: verify
+
+# Set up as a pipeline schedule with GUARD_SCHEDULE=monitor (every 3 hours). Runs only this job.
+monitor:scheduled:
+  extends: .guard
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $GUARD_SCHEDULE == "monitor"
+  variables:
+    GUARD_BASELINE_JOB: monitor:post-deploy
+
+# ---------------------------------------------------------------- release
+
+release:notes:
+  stage: release
+  extends: .main
+  image: $NODE_IMAGE
+  needs:
+    - monitor:post-deploy
+    - job: test:program
+      optional: true
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - node scripts/guard/release-notes.mjs > release-notes.md
+    - cat release-notes.md
+  artifacts:
+    paths: [release-notes.md]
+
+release:create:
+  stage: release
+  extends: .main
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs: [release:notes]
+  script: [echo "Releasing $CI_COMMIT_SHORT_SHA"]
+  release:
+    tag_name: v1.0.$CI_PIPELINE_IID
+    name: Sonar v1.0.$CI_PIPELINE_IID
+    ref: $CI_COMMIT_SHA
+    description: release-notes.md

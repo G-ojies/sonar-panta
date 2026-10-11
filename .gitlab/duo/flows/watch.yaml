@@ -1,0 +1,135 @@
+# Sonar Watch (monitor + verify). Trigger: Pipeline events > Failed.
+# The goal is the pipeline webhook payload. A classifier reads which jobs failed:
+#   - monitor:* or deploy:* failed  -> incident: open an issue with the Guard report and a revert MR
+#   - test:* failed                -> CI fix: propose a fix MR on a new branch
+#   - anything else (scanners, a canceled run) -> stop
+# Nothing is merged or deployed by the agents: a person approves the revert or the fix.
+version: "v1"
+environment: ambient
+name: "Sonar Watch"
+description: "Turn a failed Sonar pipeline into an incident issue with a revert MR, or a proposed CI fix."
+
+components:
+  - name: "classify"
+    type: AgentComponent
+    prompt_id: "classify_prompt"
+    response_schema_id: "watch_class"
+    inputs:
+      - from: "context:goal"
+        as: "payload"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset: ["get_pipeline_failing_jobs", "get_pipeline_errors", "get_job_logs"]
+    max_cycles: 20
+
+  - name: "incident"
+    type: AgentComponent
+    prompt_id: "incident_prompt"
+    inputs:
+      - from: "context:classify.final_answer"
+        as: "classification"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset: ["get_job_logs", "get_commit", "get_commit_diff", "list_commits", "list_issues", "create_issue", "create_issue_note", "run_git_command", "create_merge_request"]
+    max_cycles: 60
+    ui_log_events: ["on_agent_final_answer", "on_tool_execution_success", "on_tool_execution_failed"]
+
+  - name: "ci_fixer"
+    type: AgentComponent
+    prompt_id: "ci_fix_prompt"
+    inputs:
+      - from: "context:classify.final_answer"
+        as: "classification"
+      - from: "context:project_id"
+        as: "project_id"
+    toolset: ["get_job_logs", "get_pipeline_errors", "read_file", "read_files", "grep", "find_files", "edit_file", "run_command", "run_git_command", "create_merge_request", "ci_linter"]
+    max_cycles: 120
+    ui_log_events: ["on_agent_final_answer", "on_tool_execution_success", "on_tool_execution_failed"]
+
+response_schemas:
+  - schema_id: "watch_class"
+    definition:
+      type: object
+      properties:
+        kind: { type: string, enum: ["incident", "ci_failure", "ignore"] }
+        pipeline_id: { type: integer }
+        ref: { type: string }
+        sha: { type: string }
+        failed_jobs: { type: array, items: { type: string } }
+        evidence: { type: string, description: "the key log lines, verbatim, at most 40 lines" }
+      required: [kind, pipeline_id, ref, sha, failed_jobs, evidence]
+
+prompts:
+  - prompt_id: "classify_prompt"
+    name: "Watch classifier"
+    unit_primitives: []
+    prompt_template:
+      system: |
+        You get a GitLab pipeline webhook payload for Sonar. Find the failed jobs (use the tools if the
+        payload is not enough) and classify:
+        - "incident" if any failed job name starts with monitor: or deploy: (the live site is broken or a deploy
+          did not land). Put the Guard report table from the job log in evidence.
+        - "ci_failure" if a job named test:web or test:program failed. Put the failing test output in evidence.
+        - "ignore" for anything else, including a canceled pipeline or only security scanners failing.
+      user: |
+        Project id: {{project_id}}
+        Payload: {{payload}}
+    params:
+      timeout: 180
+
+  - prompt_id: "incident_prompt"
+    name: "Watch incident"
+    unit_primitives: []
+    prompt_template:
+      system: |
+        The live Sonar site failed its post-deploy or scheduled Guard checks. Do exactly this:
+        1. Look for an open issue labelled incident for the same failing checks. If one exists, add a note
+           with the new evidence and stop.
+        2. Otherwise create an issue titled "Incident: <failing check ids> on <short sha>" with labels
+           incident and severity::high. Body: what failed (the Guard report table, verbatim), when, the
+           pipeline link, the commit and its diff summary, and the likely cause in two or three sentences.
+           Include a short "What a person should check" list (Render dashboard, Upstash usage page, /api/health).
+        3. If the failure came from monitor:post-deploy (a new deploy is live and broken), create a branch
+           guard/revert-<short sha>, run `git revert --no-edit <sha>`, push it, and open a merge request that
+           says it rolls back the deploy and links the incident issue. If the failing check is radar-fresh,
+           store or record on a scheduled run (no new deploy), do NOT revert: the cause is data or a provider, so say so.
+        Never touch onchain/, CI variables or secrets. Never merge.
+      user: |
+        Project id: {{project_id}}
+        Classification: {{classification}}
+    params:
+      timeout: 600
+
+  - prompt_id: "ci_fix_prompt"
+    name: "Watch CI fixer"
+    unit_primitives: []
+    prompt_template:
+      system: |
+        A Sonar test job failed. Find the root cause from the job log and the code. Rules:
+        - Work on a new branch guard/fix-<pipeline id>. Never commit to the default branch.
+        - Fix the code, not the test, unless the test is plainly wrong; say which and why in the MR.
+        - Never edit anything under onchain/ (program changes need a person) or any secret. If the failure is
+          in test:program, open an issue-style MR description with the diagnosis and no code change.
+        - Run `npm ci && npm run typecheck && npm test` before pushing.
+        - Open a merge request with the diagnosis, the failing output, and what you changed.
+      user: |
+        Project id: {{project_id}}
+        Classification: {{classification}}
+    params:
+      timeout: 600
+
+routers:
+  - from: "classify"
+    condition:
+      input: "context:classify.final_answer.kind"
+      routes:
+        "incident": "incident"
+        "ci_failure": "ci_fixer"
+        "default_route": "end"
+  - from: "incident"
+    to: "end"
+  - from: "ci_fixer"
+    to: "end"
+
+flow:
+  entry_point: "classify"

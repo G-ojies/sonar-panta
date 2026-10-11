@@ -25,5 +25,7 @@ export async function GET() {
     ok: true, store: storeKind(), panta, radarUpdatedAt: log[0]?.ts ?? null, radarMarkets: log[0]?.kept ?? 0,
     lastRefresh: log[0] ?? null, cluster: process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? 'mainnet-beta',
     chain: chainHealth(),
+    // the deployed commit, so a pipeline can tell when its deploy is live (Render and Vercel set these)
+    commit: process.env.RENDER_GIT_COMMIT ?? process.env.VERCEL_GIT_COMMIT_SHA ?? null,
   });
 }

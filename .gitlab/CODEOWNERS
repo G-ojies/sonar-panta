@@ -1,0 +1,11 @@
+# A person must approve any change to the on-chain program, the pipeline or the agent flows.
+# Agents can propose these changes (or review them), never approve them.
+# Replace @OWNER with the GitLab username once the project is imported (docs/GITLAB.md).
+
+[Program] @OWNER
+/onchain/
+
+[Pipeline and agents] @OWNER
+/.gitlab-ci.yml
+/.gitlab/
+/render.yaml
