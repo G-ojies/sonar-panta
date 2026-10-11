@@ -281,6 +281,8 @@ const OFF: StreamHealth = {
 
 /** A long-lived socket needs a long-lived process: on by default, off on serverless hosts and during the build. SONAR_TAPE_STREAM=on|off overrides. */
 export function streamEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  // a read-only deployment shares the database with the main one, so it must not write the stream's cursor or tapes
+  if (env.SONAR_READ_ONLY === '1') return false;
   if (env.SONAR_TAPE_STREAM === 'off') return false;
   if (env.SONAR_TAPE_STREAM === 'on') return true;
   return !env.VERCEL && env.NEXT_PHASE !== 'phase-production-build';

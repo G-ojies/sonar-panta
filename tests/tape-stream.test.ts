@@ -310,4 +310,6 @@ test('streamEnabled: on for a long-lived server, off on serverless hosts and dur
   assert.equal(streamEnabled({ NEXT_PHASE: 'phase-production-build' }), false);
   assert.equal(streamEnabled({ VERCEL: '1', SONAR_TAPE_STREAM: 'on' }), true);
   assert.equal(streamEnabled({ SONAR_TAPE_STREAM: 'off' }), false);
+  // a read-only deployment never streams, even when forced on
+  assert.equal(streamEnabled({ SONAR_READ_ONLY: '1', SONAR_TAPE_STREAM: 'on' }), false);
 });

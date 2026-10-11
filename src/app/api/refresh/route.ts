@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { refreshRadar } from '@/lib/radar';
-import { fail } from '../_util';
+import { fail, readOnly } from '../_util';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /** Called by Vercel Cron (Authorization: Bearer CRON_SECRET) or manually with ?key= */
 export async function GET(req: NextRequest) {
+  const off = readOnly();
+  if (off) return off;
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get('authorization');
   const key = req.nextUrl.searchParams.get('key');
