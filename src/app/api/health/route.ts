@@ -22,7 +22,7 @@ export async function GET() {
   const [log, panta] = await Promise.all([readRefreshLog(), pantaStatus()]);
   // The first call after boot starts the live tape stream, so the host's own health check is what brings it up.
   return NextResponse.json({
-    ok: true, store: storeKind(), panta, radarUpdatedAt: log[0]?.ts ?? null, radarMarkets: log[0]?.kept ?? 0,
+    ok: true, store: storeKind(), panta,
     lastRefresh: log[0] ?? null, cluster: process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? 'mainnet-beta',
     chain: chainHealth(),
     // the deployed commit, so a pipeline can tell when its deploy is live (Render and Vercel set these)
