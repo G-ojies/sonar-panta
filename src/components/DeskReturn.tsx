@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { postJson } from './useApi';
 
 /** PayPal sends the buyer back here (?token=<order id>) after approving an order the agent opened: capture it and show the brief. */
-interface Res { brief: { marketId: string; title: string; status: string; call: { side: string; score: number } }; text: { headline: string; body: string[]; risks: string[] } | null }
+interface Res { brief: { marketId: string; title: string; status: string; outcome?: string; demo?: boolean; call: { side: string; score: number } }; text: { headline: string; body: string[]; risks: string[] } | null }
 
 export function DeskReturn() {
   const q = useSearchParams();
@@ -31,7 +31,9 @@ export function DeskReturn() {
         {err && <p className="text-no">{err}</p>}
         {res && (
           <>
-            <p className="text-xs text-ping">Paid · guarantee open: refunded through PayPal if this market resolves against {res.brief.call.side}.</p>
+            {res.brief.status === 'paid' && <p className="text-xs text-ping">Paid · guarantee open: refunded through PayPal if this market resolves against {res.brief.call.side}.</p>}
+            {res.brief.status === 'kept' && <p className="text-xs text-yes">Call was right ({res.brief.outcome}).</p>}
+            {res.brief.status === 'refunded' && <p className="text-xs text-amber">{res.brief.demo ? `Sandbox demo: simulated outcome ${res.brief.outcome}, so the call was wrong; refunded to your PayPal.` : `Call was wrong (${res.brief.outcome}); refunded to your PayPal.`}</p>}
             <h1 className="text-lg font-semibold">{res.text?.headline ?? res.brief.title}</h1>
             <ul className="space-y-1.5 text-fog">{res.text?.body.map((b, i) => <li key={i}>{b}</li>)}</ul>
             <div className="border-t border-line pt-2 text-xs text-fog-2">{res.text?.risks.map((r, i) => <p key={i}>{r}</p>)}</div>
