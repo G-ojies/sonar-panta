@@ -73,8 +73,11 @@ private testing field (sandbox personal account). The free Render instance may t
 3. **0:55 The agent (50 s).** On /desk set budget $4, crypto, strength 20. Type "Find the strongest calls and buy their
    briefs." Show the tool steps (searched Sonar, opened a PayPal order) and the approval card. Ask it to buy the same brief
    again: refused by the server. Approve in PayPal, land on the brief.
-4. **1:45 The guarantee (35 s).** Show a settled market: the sweep refunded the wrong call through PayPal (refund id), the
-   right one kept. Show the webhook log with verified signatures.
+4. **1:45 The guarantee (35 s).** No bought call settles before the deadline, so on screen say "Sandbox demo: simulated
+   outcome, real refund". Run `curl -X POST -H "Authorization: Bearer $DESK_SECRET" -d '{"briefId":"<id>"}'
+   https://sonar-desk.onrender.com/api/desk/demo` (outcome defaults to against the call), then show the brief turning
+   "refunded", the refund in the sandbox buyer's PayPal activity, and /desk listing it under "Sandbox demo settlements"
+   (kept out of the guarantee stats). Show the webhook log with verified signatures.
 5. **2:20 Sonar Pro (20 s).** Subscribe in PayPal, return, "Sonar Pro is active", read a brief with no checkout.
 6. **2:40 Close (15 s).** Stack: PayPal Orders, Refunds, Subscriptions, Webhooks, JS SDK v6, Agent Toolkit; AI SDK + Groq.
    "An agent that shops, but can't spend without you."
