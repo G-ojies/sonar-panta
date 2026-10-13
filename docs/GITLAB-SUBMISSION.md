@@ -11,7 +11,7 @@ Deadline 27 October 2026, 13:00 UTC. Target date to submit: 25 October. No pushe
 - **Pipeline history:** https://gitlab.com/gitlab-ai-hackathon/transcend-october-2026/43258699/sonar-guard/-/pipelines
 - **Deployed project:** https://sonarpanta.xyz (deployed by the GitLab pipeline since 11 October)
 - **Original MIT project:** https://github.com/G-ojies/sonar-panta
-- **Demo video (YouTube, under 3 min):** TODO
+- **Demo video (YouTube, under 3 min):** https://youtu.be/d5VJ4AQwz6I
 - **Google Cloud bonus:** not claimed (deployed on Render's free tier)
 - **Most Environmentally Impactful:** not opted in
 - **Built with:** gitlab-duo-agent-platform, gitlab-ci, gitlab-releases, gitlab-container-registry, gitlab-package-registry, gitlab-sast, next.js, typescript, upstash-redis, anchor, rust, solana, render
