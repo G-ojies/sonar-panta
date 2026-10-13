@@ -22,6 +22,10 @@ we wanted an agent that can buy these signals for you, inside a budget you set, 
   only: the trade tape, the price path and other venues.
 - **Accuracy guarantee:** when the market resolves against the frozen call, or is cancelled, Sonar refunds the capture
   through the PayPal Refunds API automatically. The guarantee's record (right / refunded) is public on /desk.
+  No market with a bought call resolves before judging, so the video shows a **labelled sandbox demo settlement**: a
+  secret-protected, sandbox-only route settles one brief as if its market resolved against the call. The outcome is
+  simulated; the refund is real and runs the same guarantee code. Demo settlements are listed apart and never counted
+  in the public record.
 - **Shopping agent** on /desk: you set a mandate (budget, categories, least call strength) and chat. The agent searches
   Sonar's radar, opens a PayPal order for each brief that fits, and stops: every order waits for you to approve it in
   PayPal. The budget and limits are enforced in code on every purchase, not by the model. It can then read and summarise
@@ -41,7 +45,7 @@ write the radar.
 **What changed since 1 Oct (Sonar existed before the hackathon)**
 Everything PayPal and everything agentic is new: the brief checkout and writer, the accuracy guarantee and refund sweep,
 the shopping agent and mandate gate, Sonar Pro, webhooks, the /desk pages, and the read-only deployment mode.
-Branch `paypal`: about 3,500 lines across 36 files, 14 new tests (143 total).
+Branch `paypal` (first commit 11 Oct): about 3,700 lines across 38 files, 15 new tests (144 total).
 
 **Challenges**
 - Making the agent safe with money: the model never gets a tool that pays. It opens orders; a person approves in
@@ -53,6 +57,8 @@ Branch `paypal`: about 3,500 lines across 36 files, 14 new tests (143 total).
 
 **Accomplishments**
 A refund guarantee that actually runs, end to end in the PayPal sandbox, and an agent that shops but cannot spend.
+
+**Video:** https://youtu.be/EvmJlYSCYK0 (2:52, narration is synthesised with Piper TTS, no music)
 
 **What's next**
 Partial refunds scaled to how wrong the call was; Pro members credited for missed calls; the agent running on a
@@ -82,4 +88,4 @@ private testing field (sandbox personal account). The free Render instance may t
 6. **2:40 Close (15 s).** Stack: PayPal Orders, Refunds, Subscriptions, Webhooks, JS SDK v6, Agent Toolkit; AI SDK + Groq.
    "An agent that shops, but can't spend without you."
 
-Record at 1440x900, no music (or licensed only), upload public to YouTube.
+Recorded at 1280x720 from the live sandbox deployment (~/Development/paypal-desk-video), no music, public on YouTube.
