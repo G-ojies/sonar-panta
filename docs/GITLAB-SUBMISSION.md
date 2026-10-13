@@ -1,6 +1,6 @@
 # GitLab "Life After Code" (Transcend): Devpost answers
 
-Deadline 27 October 2026, 13:00 UTC. Target date to submit: 25 October. No pushes to the GitLab project after the deadline.
+**SUBMITTED 13 October 2026:** https://devpost.com/software/sonar-guard (editable until 27 October 2026, 13:00 UTC). No pushes to the GitLab project after the deadline.
 
 ## Fields
 
