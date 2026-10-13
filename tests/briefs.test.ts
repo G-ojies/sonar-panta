@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { guarantee, ledgerStats, outcomeOf, sellable, freezeCall, type Brief } from '../src/lib/briefs';
+import { demoSettlement, guarantee, ledgerStats, outcomeOf, sellable, freezeCall, type Brief } from '../src/lib/briefs';
 import { client, firstCapture, approveUrl, usd, type PayPalConfig } from '../src/lib/paypal';
 import type { RadarMarket } from '../src/lib/types';
 import { market, T0 } from './helpers';
@@ -116,4 +116,22 @@ test('guarantee: a Sonar Pro brief has nothing to refund, so a wrong call is rec
   assert.equal(guarantee(pro('NO'), yesWon).kind, 'miss');
   assert.equal(guarantee(pro('NO'), market()).kind, 'wait');
   assert.equal(ledgerStats([{ ...pro('NO'), status: 'missed' }, { ...pro('YES'), status: 'kept' }]).hitRate, 0.5);
+});
+
+test('demo settlement: refunds against the call by default, says so to the payer, and stays out of the record', () => {
+  const a = demoSettlement(paid('YES'));
+  assert.equal(a.kind, 'refund');
+  if (a.kind !== 'refund') return;
+  assert.equal(a.brief.outcome, 'NO');
+  assert.equal(a.brief.demo, true);
+  assert.ok(a.note.startsWith('[Sandbox demo, simulated outcome]'));
+  assert.equal(demoSettlement(paid('NO'), 'NO').kind, 'keep');
+  assert.equal(demoSettlement(paid('YES'), 'CANCELLED').kind, 'refund');
+  assert.equal(demoSettlement(paid('YES', { status: 'pending' })).kind, 'refuse');
+  assert.equal(demoSettlement(paid('YES', { status: 'refunded' })).kind, 'refuse');
+  assert.equal(demoSettlement(paid('YES', { captureId: undefined, via: 'pro', subscriptionId: 'I-1', priceCents: 0 })).kind, 'refuse');
+  const s = ledgerStats([{ ...a.brief, status: 'refunded' }, paid('YES', { status: 'kept' })]);
+  assert.equal(s.refunded, 0);
+  assert.equal(s.sold, 1);
+  assert.equal(s.hitRate, 1);
 });

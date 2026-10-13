@@ -33,6 +33,8 @@ export interface Brief {
   subscriptionId?: string;
   /** the shopping-agent session that created it, for the session budget */
   session?: string;
+  /** settled by a sandbox demo with a simulated outcome (the refund is real); never counted in the public record */
+  demo?: boolean;
 }
 
 /** Sonar only sells a brief when it has a side; a FLAT market has nothing to guarantee. */
@@ -72,8 +74,30 @@ export function guarantee(b: Brief, d: MarketDetail | null): GuaranteeAction {
   return { kind: 'keep', brief: { ...b, outcome: o } };
 }
 
-/** The guarantee's public record: how many paid briefs were right, and how much went back to buyers. */
-export function ledgerStats(briefs: Brief[]) {
+/**
+ * A sandbox-only stand-in for a resolved market, so the real refund path can be shown before any bought call settles.
+ * Only the outcome is simulated: guarantee() and the PayPal refund run exactly as they do for a real resolution.
+ */
+export function demoResolution(outcome: 'YES' | 'NO' | 'CANCELLED'): MarketDetail {
+  if (outcome === 'CANCELLED') return { phase: 'cancelled', resolved: false } as MarketDetail;
+  return { phase: 'resolved', resolved: true, yesPrice: outcome === 'YES' ? '1' : '0' } as MarketDetail;
+}
+
+/**
+ * What a sandbox demo settlement does with one brief. The outcome defaults to the opposite of the call, so the demo shows
+ * a refund. Only paid one-off briefs qualify (a Pro brief has no capture to refund). The note tells the payer it was a demo.
+ */
+export function demoSettlement(b: Brief, outcome?: 'YES' | 'NO' | 'CANCELLED'): GuaranteeAction | { kind: 'refuse'; reason: string } {
+  if (b.status !== 'paid') return { kind: 'refuse', reason: `brief is ${b.status}, not paid` };
+  if (!b.captureId) return { kind: 'refuse', reason: 'brief has no PayPal capture to refund' };
+  const a = guarantee(b, demoResolution(outcome ?? (b.call.side === 'YES' ? 'NO' : 'YES')));
+  const brief = { ...a.brief, demo: true };
+  return a.kind === 'refund' ? { ...a, brief, note: `[Sandbox demo, simulated outcome] ${a.note}` } : { ...a, brief };
+}
+
+/** The guarantee's public record: how many paid briefs were right, and how much went back to buyers. Demo settlements are left out. */
+export function ledgerStats(all: Brief[]) {
+  const briefs = all.filter((b) => !b.demo);
   const settled = briefs.filter((b) => b.status === 'refunded' || b.status === 'kept' || b.status === 'missed');
   const refunded = settled.filter((b) => b.status === 'refunded');
   const kept = settled.filter((b) => b.status === 'kept');

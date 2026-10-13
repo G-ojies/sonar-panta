@@ -14,6 +14,7 @@ interface Msg { role: 'user' | 'assistant'; content: string; steps?: Step[] }
 interface Ledger {
   stats: { sold: number; open: number; right: number; refunded: number; missed?: number; refundedCents: number; keptCents: number; hitRate: number | null };
   settled: Array<{ id: string; marketId: string; title: string; side: string; outcome?: string; status: string; via: string }>;
+  demos?: Array<{ id: string; marketId: string; title: string; side: string; outcome?: string; status: string; via: string }>;
 }
 
 const CATS = ['crypto', 'sports', 'politics', 'finance', 'entertainment', 'world'];
@@ -142,6 +143,16 @@ export function DeskView() {
               <h2 className="text-sm font-semibold">Guarantee record</h2>
               {ledger.settled.slice(0, 8).map((b) => (
                 <p key={b.id} className="text-fog"><span className={b.status === 'kept' ? 'text-yes' : 'text-amber'}>{b.status === 'kept' ? 'right' : b.status === 'missed' ? 'missed (Pro)' : 'refunded'}</span> · called {b.side}, resolved {b.outcome} · {b.title}</p>
+              ))}
+            </section>
+          )}
+
+          {ledger?.demos && ledger.demos.length > 0 && (
+            <section className="card space-y-1.5 p-5 text-xs">
+              <h2 className="text-sm font-semibold">Sandbox demo settlements</h2>
+              <p className="text-fog">Simulated outcome, real PayPal sandbox refund. Not counted in the guarantee record.</p>
+              {ledger.demos.slice(0, 5).map((b) => (
+                <p key={b.id} className="text-fog"><span className={b.status === 'kept' ? 'text-yes' : 'text-amber'}>{b.status === 'kept' ? 'right' : 'refunded'}</span> · called {b.side}, demo outcome {b.outcome} · {b.title}</p>
               ))}
             </section>
           )}

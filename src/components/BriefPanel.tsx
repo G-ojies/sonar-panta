@@ -7,7 +7,7 @@ import { getPro, setPro } from './pro';
 /** Sonar Desk: buy the brief behind Sonar's call with PayPal (JS SDK v6). Refunded automatically if the call is wrong. */
 
 interface BriefText { headline: string; body: string[]; risks: string[]; via: 'groq' | 'template' }
-interface BriefRow { id: string; status: 'pending' | 'paid' | 'refunded' | 'kept' | 'missed'; call: { side: 'YES' | 'NO'; score: number }; outcome?: string; refundId?: string; via?: string }
+interface BriefRow { id: string; status: 'pending' | 'paid' | 'refunded' | 'kept' | 'missed'; call: { side: 'YES' | 'NO'; score: number }; outcome?: string; refundId?: string; via?: string; demo?: boolean }
 interface OrderRes { orderId: string; approveUrl: string | null; briefId: string; priceCents: number }
 
 interface V6Session { start(opts: { presentationMode: 'auto' | 'popup' | 'modal' | 'redirect' }, order: Promise<{ orderId: string }>): Promise<void> }
@@ -138,7 +138,7 @@ export function BriefPanel({ marketId, side, closed }: { marketId: string; side:
           <p className="text-xs">
             {brief.status === 'paid' && (brief.via === 'pro' ? <span className="text-ping">Included in Sonar Pro.</span> : <span className="text-ping">Guarantee open: refunded through PayPal if the market resolves against {brief.call.side}.</span>)}
             {brief.status === 'kept' && <span className="text-yes">Call was right ({brief.outcome}).</span>}
-            {brief.status === 'refunded' && <span className="text-amber">Call was wrong ({brief.outcome}); refunded to your PayPal.</span>}
+            {brief.status === 'refunded' && <span className="text-amber">{brief.demo ? `Sandbox demo: simulated outcome ${brief.outcome}, so the call was wrong; refunded to your PayPal.` : `Call was wrong (${brief.outcome}); refunded to your PayPal.`}</span>}
             {brief.status === 'missed' && <span className="text-amber">Call was wrong ({brief.outcome}). Covered by Sonar Pro.</span>}
           </p>
           <p className="text-[11px] text-fog-2">Written by {text.via === 'groq' ? 'gpt-oss on Groq from Sonar’s own numbers' : 'Sonar’s template'}.</p>

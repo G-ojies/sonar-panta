@@ -3,7 +3,7 @@
  * sweep that refunds wrong calls. Routes and the agent call these; PayPal and the store are passed in where tests need it.
  */
 import { randomUUID } from 'crypto';
-import { BRIEF_PRICE_CENTS, freezeCall, guarantee, sellable, type Brief } from './briefs';
+import { BRIEF_PRICE_CENTS, demoSettlement, freezeCall, guarantee, sellable, type Brief } from './briefs';
 import { approveUrl, client, firstCapture, paypalConfig, PayPalError, type PayPalClient, type Subscription } from './paypal';
 import { readMarket } from './radar';
 import { store } from './store';
@@ -137,6 +137,29 @@ export async function sweepGuarantee(pp: PayPalClient = paypal(), detail: (id: s
     } catch (e) { out.errors.push(`${b.id}: ${(e as Error).message}`); }
   }
   return out;
+}
+
+/**
+ * Sandbox only: settle one paid brief as if its market had resolved (against the call by default), through the same
+ * guarantee rule and the real PayPal refund. The brief is marked demo, so the public record never counts it.
+ */
+export async function settleDemo(briefId: string, outcome?: 'YES' | 'NO' | 'CANCELLED', pp: PayPalClient = paypal()) {
+  if (paypalConfig()?.env !== 'sandbox') throw new PayPalError(403, 'SANDBOX_ONLY', 'demo settlements only run against the PayPal sandbox');
+  const b = await readBrief(briefId);
+  if (!b) throw new PayPalError(404, 'UNKNOWN_BRIEF', 'no such brief');
+  const a = demoSettlement(b, outcome);
+  if (a.kind === 'refuse') throw new PayPalError(409, 'NOT_SETTLEABLE', a.reason);
+  if (a.kind === 'wait') throw new PayPalError(409, 'NOT_SETTLEABLE', 'no outcome to settle on');
+  const settledAt = Date.now() / 1000;
+  if (a.kind === 'refund') {
+    const r = await pp.refundCapture(b.captureId!, a.note);
+    const done: Brief = { ...a.brief, status: 'refunded', refundId: r.id, settledAt };
+    await saveBrief(done);
+    return done;
+  }
+  const done: Brief = { ...a.brief, status: a.kind === 'keep' ? 'kept' : 'missed', settledAt };
+  await saveBrief(done);
+  return done;
 }
 
 // --- Sonar Pro: $7.99 a month through PayPal Subscriptions, unlimited briefs ---
