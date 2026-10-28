@@ -75,7 +75,18 @@ Keeper: `.github/workflows/grad-keeper.yml` runs `keep` every 10 minutes from `m
 separate keeper wallet (`9gjTFjRFxoQtzt3z5xb6YFMMnc9yBEJ5HGuPB1Lknqsn`, 0.5 devnet SOL). Repo
 secrets: `GRAD_KEEPER_KEYPAIR` (the keypair JSON) and `SOLANA_DEVNET_RPC`.
 
-Not done yet: web.
+**Web (`/graduation`):** every market with its pm-AMM YES price, the pool's curve progress, the vault and
+the phase (trading, halted, deadline passed, resolved); a trade box (buy or sell YES and NO), claim after
+resolution, a one-click pm-AMM faucet (`POST /api/graduation/faucet`), and a form to open a market on any devnet
+pool. The wallet only signs; transactions go to devnet through their own connection, so it works on the
+mainnet site. JSON at `/api/graduation`. Builders and decoders in `src/lib/grad-market.ts` (tested in
+`tests/grad-market.test.ts`: offsets against pm-AMM's IDL, discriminators, Borsh args, swap account order,
+pricing, and the live market's derived address), server reads in `src/lib/grad-market-server.ts`.
+`swapPlan` and `openMarketPlan` were sent for real on devnet: a buy (560k compute units, so swaps
+request 800k) and a second market, `FametrCtmryK6mo5YzYigLnKkMMpByq1wHP2Xuxz8xFm` on pool `5LdFUP…`
+(3 days, 50 mUSDC).
+
+Next: traction. Get real wallets trading (faucet, X posts, Superteam NG), weekly updates, demo video.
 
 ### Off chain (existing Sonar pieces)
 
