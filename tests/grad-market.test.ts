@@ -4,8 +4,8 @@ import { createHash } from 'crypto';
 import { PublicKey } from '@solana/web3.js';
 import pmIdl from '../onchain/pm-amm-idl.json';
 import {
-  BINDING, BINDING_SIZE, DISC, PM_MARKET, decodeBinding, decodePmMarket, deriveMarket, encodeOpenMarket, encodeSwap, fixedToNumber,
-  normCdf, phaseOf, swapPlan, yesPrice, type GradBinding, type PmMarketState,
+  BINDING, BINDING_SIZE, DISC, PM_MARKET, crankPlan, decodeBinding, decodePmMarket, deriveMarket, dueStep, encodeOpenMarket, encodeSwap,
+  fixedToNumber, normCdf, phaseOf, swapPlan, yesPrice, type GradBinding, type PmMarketState,
 } from '../src/lib/grad-market';
 
 const sha8 = (s: string) => [...createHash('sha256').update(s).digest().subarray(0, 8)];
@@ -152,4 +152,46 @@ test('swapPlan follows the pm-AMM swap account order', () => {
   assert.equal(swap.keys[1].pubkey.toBase58(), 'FwBiXLzAsfPBoqRGMMk97tVpUPGYgURkfnnNRc2butCw');
   assert.equal(swap.keys[3].pubkey.toBase58(), m.yesMint);
   assert.equal(swap.keys[5].pubkey.toBase58(), m.vault);
+});
+
+// ---- the permissionless steps ----
+
+test('crank discriminators are the Anchor instruction hashes', () => {
+  assert.deepEqual([...DISC.halt], sha8('global:halt'));
+  assert.deepEqual([...DISC.resolve], sha8('global:resolve'));
+  assert.deepEqual([...DISC.settle], sha8('global:settle'));
+});
+
+test('phaseOf reports a known outcome before anyone halts', () => {
+  const b = decodeBinding(bindingBytes({ deadline: 1000 }));
+  const open = { resolved: false, winningSide: 0 } as PmMarketState;
+  assert.equal(phaseOf(b, open, 10, true), 'known');
+  assert.equal(phaseOf({ ...b, halted: true } as GradBinding, open, 10, true), 'halted');
+  assert.equal(phaseOf(b, open, 1000, true), 'expired');
+});
+
+test('dueStep walks halt, resolve, settle like the keeper', () => {
+  const b = decodeBinding(bindingBytes({ deadline: 1000 }));
+  assert.equal(dueStep(b, 10, false), null, 'open question, nothing to do');
+  assert.equal(dueStep(b, 10, true), 'halt', 'curve finished early');
+  assert.equal(dueStep(b, 1000, false), null, 'at the deadline the curve may still finish in time');
+  assert.equal(dueStep(b, 1001, false), 'halt', 'deadline passed');
+  const halted = { ...b, halted: true } as GradBinding;
+  assert.equal(dueStep(halted, 999, true), null, 'pm-AMM only resolves at end_ts');
+  assert.equal(dueStep(halted, 1000, true), 'resolve');
+  assert.equal(dueStep({ ...halted, resolved: true } as GradBinding, 2000, true), 'settle');
+  assert.equal(dueStep({ ...halted, resolved: true, settled: true } as GradBinding, 2000, true), null);
+});
+
+test('crankPlan account counts follow the Rust Accounts structs', () => {
+  const b = decodeBinding(bindingBytes(), 'Bk47WNJxxoXJWtbnNSjhRpNprrFUTAtfbqKSK1qJa7Vi');
+  const m = { yesMint: b.pool, noMint: b.config, vault: b.opener };
+  const caller = new PublicKey(new Uint8Array(32).fill(9));
+  const count = (s: 'halt' | 'resolve' | 'settle') => crankPlan(s, caller, b, m).at(-1)!.keys.length;
+  assert.deepEqual([count('halt'), count('resolve'), count('settle')], [15, 6, 13]);
+  const halt = crankPlan('halt', caller, b, m).at(-1)!;
+  assert.ok(halt.keys[0].isSigner && halt.keys[0].pubkey.equals(caller));
+  assert.equal(halt.keys[1].pubkey.toBase58(), b.address);
+  const d = deriveMarket(b.address);
+  assert.equal(crankPlan('settle', caller, b, m).at(-1)!.keys[1].pubkey.toBase58(), d.authority.toBase58());
 });

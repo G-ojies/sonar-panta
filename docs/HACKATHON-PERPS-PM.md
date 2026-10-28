@@ -86,6 +86,16 @@ pricing, and the live market's derived address), server reads in `src/lib/grad-m
 request 800k) and a second market, `FametrCtmryK6mo5YzYigLnKkMMpByq1wHP2Xuxz8xFm` on pool `5LdFUP…`
 (3 days, 50 mUSDC).
 
+**First full lifecycle on devnet (28 October):** the 99.6% pool did not graduate by 19:02 UTC. `halt` pulled the
+liquidity (the PDA held 97.2 YES and 102.8 NO), `resolve` settled NO from the pool account, and `settle` paid the
+opener 102.91 mUSDC (102.84 winning NO plus 0.07 creator fees) against its 100 seed.
+
+**Keeper timing:** GitHub ran the `*/10` schedule once in five hours, so cranking cannot depend on it. The page
+now shows a "known" phase (curve finished, not yet halted) with trading closed, and offers whichever step is due
+(halt, resolve, settle) to any connected wallet; `dueStep` in `src/lib/grad-market.ts` mirrors the keeper. The
+keeper also opens one market per run on the launch closest to graduating (AUTO_OPEN, at least 60% progress, at
+most 5 live, 50 mUSDC seed for 6 hours, faucet top-up).
+
 Next: traction. Get real wallets trading (faucet, X posts, Superteam NG), weekly updates, demo video.
 
 ### Off chain (existing Sonar pieces)
