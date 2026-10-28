@@ -7,9 +7,11 @@ skip-lint = false
 
 [programs.localnet]
 curve_market = "DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp"
+grad_resolver = "73G7X9FKEgTtNQMBWGsCGZfHHBpvVxsJ9kqvV6mvubJH"
 
 [programs.devnet]
 curve_market = "DPsFa2nxH568WZdeAgmdaxBrS3Je4UK4K7axxzCYAqjp"
+grad_resolver = "73G7X9FKEgTtNQMBWGsCGZfHHBpvVxsJ9kqvV6mvubJH"
 
 [provider]
 cluster = "devnet"

@@ -1,0 +1,40 @@
+# Cranks the grad_resolver graduation markets on devnet: halts a market once its pool shows the
+# outcome, resolves it after the deadline and settles it to the opener. Every step is
+# permissionless, so the keeper is a separate wallet holding only devnet SOL for fees and the
+# halt's two token accounts (about 0.004 SOL per market), never the programs' upgrade authority.
+name: grad-keeper
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: grad-keeper
+  cancel-in-progress: false
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      RPC: ${{ secrets.SOLANA_DEVNET_RPC }}
+      KEEPER_KEYPAIR: ${{ secrets.GRAD_KEEPER_KEYPAIR }}
+    steps:
+      - name: Check secrets
+        id: check
+        run: |
+          if [ -z "$RPC" ] || [ -z "$KEEPER_KEYPAIR" ]; then
+            echo "::notice::SOLANA_DEVNET_RPC / GRAD_KEEPER_KEYPAIR not set; skipping"; echo "ok=false" >> "$GITHUB_OUTPUT"
+          else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ok == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ok == 'true'
+        with: { node-version: 20, cache: npm }
+      - run: npm ci
+        if: steps.check.outputs.ok == 'true'
+      - name: Crank every market that is due
+        if: steps.check.outputs.ok == 'true'
+        run: |
+          umask 077
+          printf '%s' "$KEEPER_KEYPAIR" > "$RUNNER_TEMP/keeper.json"
+          KEYPAIR="$RUNNER_TEMP/keeper.json" npx tsx scripts/grad-market-devnet.ts keep
+          rm -f "$RUNNER_TEMP/keeper.json"
