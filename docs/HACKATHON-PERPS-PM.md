@@ -59,7 +59,19 @@ Costs: `open_market` uses about 660k compute units (pm-AMM's first deposit alone
 so clients must request a 1.4M budget; it moves 0.06 SOL to the market's PDA for pm-AMM's rent.
 `halt` about 95k, `resolve` about 18k, `settle` about 89k.
 
-Not done yet: devnet deploy, keeper, web.
+**Live on devnet (28 October):** `grad_resolver` deployed at
+`73G7X9FKEgTtNQMBWGsCGZfHHBpvVxsJ9kqvV6mvubJH` (upgrade authority FHj8w7…). First market:
+binding `Bk47WNJxxoXJWtbnNSjhRpNprrFUTAtfbqKSK1qJa7Vi`, pm-AMM market
+`FwBiXLzAsfPBoqRGMMk97tVpUPGYgURkfnnNRc2butCw`, on DBC pool `23gLA7…` (99.6% of its threshold
+when opened), 100 mUSDC seed, deadline 19:02 UTC. A 5 mUSDC YES buy went through pm-AMM and
+paid the PDA 0.05 mUSDC of creator fee; `halt` answered `NotYet` while the pool was open.
+
+`scripts/grad-market-devnet.ts` drives it: `find` (open pools from the recent DBC tape), `open`,
+`show`, `buy`, `halt`, `resolve`, `settle`, and `keep` (crank whatever is due on every market).
+The RPC comes from `SOLANA_DEVNET_RPC` in `.env.local` (an Alchemy devnet key); the public
+endpoints rate-limit program deploys.
+
+Not done yet: run `keep` on a schedule, web.
 
 ### Off chain (existing Sonar pieces)
 
