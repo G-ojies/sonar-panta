@@ -51,6 +51,10 @@ export const DISC = {
   openMarket: Uint8Array.from([116, 19, 123, 75, 217, 244, 69, 44]),
   swap: Uint8Array.from([248, 198, 158, 145, 225, 117, 135, 200]),
   claimWinnings: Uint8Array.from([161, 215, 24, 59, 14, 236, 242, 221]),
+  /** sha256("global:halt" | "global:resolve" | "global:settle"), first 8 bytes. */
+  halt: Uint8Array.from([24, 156, 8, 121, 65, 3, 5, 82]),
+  resolve: Uint8Array.from([246, 150, 236, 206, 108, 63, 58, 10]),
+  settle: Uint8Array.from([175, 42, 185, 87, 144, 131, 102, 212]),
 };
 
 export type Side = 'yes' | 'no';
@@ -165,14 +169,30 @@ export function yesPrice(m: PmMarketState): number | null {
   return normCdf((fixedToNumber(m.reserveNoBits) - fixedToNumber(m.reserveYesBits)) / lEff);
 }
 
-export type MarketPhase = 'trading' | 'halted' | 'resolved-yes' | 'resolved-no' | 'expired';
+/** `known`: the pool already shows the outcome but nobody has halted trading yet. */
+export type MarketPhase = 'trading' | 'known' | 'halted' | 'resolved-yes' | 'resolved-no' | 'expired';
 
-/** Where a market stands, from the binding and the pm-AMM market. */
-export function phaseOf(b: GradBinding, m: PmMarketState | null, now: number): MarketPhase {
+/** Where a market stands, from the binding, the pm-AMM market and whether the pool's curve is complete. */
+export function phaseOf(b: GradBinding, m: PmMarketState | null, now: number, poolComplete = false): MarketPhase {
   if (m?.resolved) return m.winningSide === 1 ? 'resolved-yes' : 'resolved-no';
   if (b.halted) return 'halted';
   if (now >= b.deadlineTs) return 'expired';
+  if (poolComplete) return 'known';
   return 'trading';
+}
+
+export type CrankStep = 'halt' | 'resolve' | 'settle';
+
+/**
+ * The permissionless step a market is waiting for, if any. Mirrors the keeper (scripts/grad-market-devnet.ts):
+ * halt once the outcome is known (curve complete, or past the deadline), resolve once halted and at or past the
+ * deadline (pm-AMM's end_ts), settle once resolved.
+ */
+export function dueStep(b: GradBinding, now: number, poolComplete: boolean): CrankStep | null {
+  if (b.settled) return null;
+  if (b.resolved) return 'settle';
+  if (!b.halted) return poolComplete || now > b.deadlineTs ? 'halt' : null;
+  return now >= b.deadlineTs ? 'resolve' : null;
 }
 
 // ---- addresses ----
@@ -219,6 +239,8 @@ export function deriveMarket(binding: string | PublicKey) {
     pmVault: pda([utf8('vault'), pmMarket.toBytes()], PM_AMM_PROGRAM),
     lpPosition: pda([utf8('lp'), pmMarket.toBytes(), authority.toBytes()], PM_AMM_PROGRAM),
     collateral: pda([utf8('collateral'), b.toBytes()], GRAD_PROGRAM),
+    authYes: pda([utf8('yes'), b.toBytes()], GRAD_PROGRAM),
+    authNo: pda([utf8('no'), b.toBytes()], GRAD_PROGRAM),
     yesMeta: metadata(yesMint),
     noMeta: metadata(noMint),
   };
@@ -293,4 +315,24 @@ export function friendlyGradError(message: string): string {
   if (/insufficient funds|0x1\b/.test(m)) return 'Not enough mUSDC or SOL in this wallet. Use the faucet button for test funds.';
   if (/already in use/.test(m)) return 'A market with this pool and deadline already exists.';
   return m.split('\n')[0].slice(0, 300);
+}
+
+/**
+ * Halt, resolve or settle a market. Every step is permissionless: whoever signs pays the fee (and, for halt, the
+ * rent of the PDA's two outcome-token accounts), and settle always pays the opener.
+ */
+export function crankPlan(step: CrankStep, caller: PublicKey, b: GradBinding, m: Pick<PmMarketState, 'yesMint' | 'noMint' | 'vault'>): TransactionInstruction[] {
+  const d = deriveMarket(b.address);
+  const keys: Record<CrankStep, AccountMeta[]> = {
+    halt: [
+      w(caller, true), w(b.address), r(b.pool), r(b.config), w(d.authority), w(b.pmMarket), r(b.collateralMint),
+      w(m.yesMint), w(m.noMint), w(d.lpPosition), w(d.authYes), w(d.authNo), r(PM_AMM_PROGRAM), r(TOKEN_PROGRAM), r(SystemProgram.programId),
+    ],
+    resolve: [w(b.address), r(b.pool), r(b.config), r(d.authority), w(b.pmMarket), r(PM_AMM_PROGRAM)],
+    settle: [
+      w(b.address), w(d.authority), r(b.pmMarket), r(b.collateralMint), w(m.yesMint), w(m.noMint), w(m.vault), w(d.collateral),
+      w(d.authYes), w(d.authNo), w(ata(b.opener, b.collateralMint)), r(PM_AMM_PROGRAM), r(TOKEN_PROGRAM),
+    ],
+  };
+  return [ComputeBudgetProgram.setComputeUnitLimit({ units: SWAP_CU }), ix(GRAD_PROGRAM, keys[step], DISC[step])];
 }

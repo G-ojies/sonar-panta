@@ -8,6 +8,11 @@
  *   npx tsx scripts/grad-market-devnet.ts halt|resolve|settle <binding>
  *   npx tsx scripts/grad-market-devnet.ts keep                                    crank every market that is due
  *
+ * With AUTO_OPEN=1, `keep` also opens one market per run on the launch closest to graduating (at least
+ * AUTO_MIN_PROGRESS percent, default 60) that has no live market, while fewer than AUTO_MAX_LIVE (default 5) are
+ * live and the wallet holds at least 0.15 SOL. It seeds AUTO_SEED mUSDC (default 50) for AUTO_SECS seconds
+ * (default 6 hours) and asks pm-AMM's faucet for mUSDC when the wallet runs short.
+ *
  * KEYPAIR (default ~/.config/solana/id.json) signs; RPC is where it goes (default SOLANA_DEVNET_RPC
  * from .env.local, else the public devnet endpoint). `keep` lists markets through LIST_RPC (default the
  * public endpoints), because Alchemy's free tier refuses getProgramAccounts. COLLATERAL defaults to pm-AMM's devnet mUSDC,
@@ -143,12 +148,9 @@ async function poolStatus(pool: PublicKey) {
   return { config: new PublicKey(p.config), reserve, threshold, complete, progress: Number((reserve * 10_000n) / (threshold || 1n)) / 100 };
 }
 
-async function main() {
-  const [cmd, ...a] = process.argv.slice(2);
-  console.log(`wallet ${signer.publicKey.toBase58()} ${(await conn.getBalance(signer.publicKey)) / 1e9} SOL`);
-
-  if (cmd === 'find') {
-    const sigs = await conn.getSignaturesForAddress(new PublicKey(DBC_PROGRAM), { limit: 60 });
+/** Pools seen on the recent DBC tape, with their status. */
+async function recentPools() {
+  const sigs = await conn.getSignaturesForAddress(new PublicKey(DBC_PROGRAM), { limit: 60 });
     const pools = new Set<string>();
     for (const s of sigs.filter((x) => !x.err).slice(0, 30)) {
       const res = await fetch(RPC, {
@@ -159,17 +161,17 @@ async function main() {
       const tx = ((await res.json()) as { result?: DbcTx }).result;
       if (tx) for (const p of printsFromTx(s.signature, tx)) pools.add(p.pool);
     }
-    for (const p of pools) {
-      const st = await poolStatus(new PublicKey(p));
-      if (st) console.log(`${p}  ${st.complete ? 'COMPLETE' : 'open'}  ${st.progress}% of threshold`);
-    }
-    return;
+  const out = [];
+  for (const p of pools) {
+    const st = await poolStatus(new PublicKey(p));
+    if (st) out.push({ pool: p, ...st });
   }
+  return out;
+}
 
-  if (cmd === 'open') {
-    const pool = new PublicKey(a[0]);
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + Number(a[1]));
-    const seed = units(a[2]);
+/** Open a market on `pool` closing `secondsAhead` from now, seeded with `seed` mUSDC base units. */
+async function openMarket(pool: PublicKey, secondsAhead: number, seed: bigint, priceBps = 5000) {
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + secondsAhead);
     const st = await poolStatus(pool);
     if (!st) throw new Error('not a DBC pool');
     if (st.complete) throw new Error('pool already complete');
@@ -177,7 +179,7 @@ async function main() {
     const d = derive(binding);
     const name = `Graduates by ${new Date(Number(deadline) * 1000).toISOString().slice(0, 16)}Z?`;
     const nameBuf = Buffer.from(name);
-    const data = Buffer.concat([ixDisc('open_market'), i64(deadline), u16(Number(a[3] ?? 5000)), u64(seed), u64(nameBuf.length).subarray(0, 4), nameBuf]);
+    const data = Buffer.concat([ixDisc('open_market'), i64(deadline), u16(priceBps), u64(seed), u64(nameBuf.length).subarray(0, 4), nameBuf]);
     const ix = new TransactionInstruction({
       programId: GRAD,
       keys: [
@@ -189,14 +191,61 @@ async function main() {
     });
     console.log('binding', binding.toBase58(), 'pm market', d.pmMarket.toBase58());
     console.log('signature', await send([ix], 1_400_000));
+}
+
+/** The wallet's mUSDC, topped up from pm-AMM's devnet faucet when it is below `need`. */
+async function ensureCollateral(need: bigint): Promise<bigint> {
+  const held = async () => BigInt((await conn.getTokenAccountBalance(ata(signer.publicKey)).catch(() => null))?.value.amount ?? '0');
+  let bal = await held();
+  if (bal >= need) return bal;
+  const res = await fetch('https://pm-amm-devnet.vercel.app/api/faucet', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ wallet: signer.publicKey.toBase58() }),
+  }).catch(() => null);
+  console.log(`faucet: ${res?.status ?? 'no answer'}`);
+  for (let i = 0; i < 10 && bal < need; i++) { await new Promise((r) => setTimeout(r, 3000)); bal = await held(); }
+  return bal;
+}
+
+/** One market per run on the launch closest to graduating that has no live market. */
+async function autoOpen(live: Binding[]) {
+  const minProgress = Number(process.env.AUTO_MIN_PROGRESS ?? 60);
+  const maxLive = Number(process.env.AUTO_MAX_LIVE ?? 5);
+  const seed = units(process.env.AUTO_SEED ?? '50');
+  const secs = Number(process.env.AUTO_SECS ?? 6 * 3600);
+  if (live.length >= maxLive) return console.log(`auto-open: ${live.length} markets live, cap ${maxLive}`);
+  if ((await conn.getBalance(signer.publicKey)) < 0.15e9) return console.log('auto-open: under 0.15 SOL, skipping');
+  const taken = new Set(live.map((b) => b.pool.toBase58()));
+  const candidates = (await recentPools())
+    .filter((p) => !p.complete && p.progress >= minProgress && !taken.has(p.pool))
+    .sort((x, y) => y.progress - x.progress);
+  if (!candidates.length) return console.log(`auto-open: no open launch at ${minProgress}% or more without a market`);
+  if ((await ensureCollateral(seed)) < seed) return console.log('auto-open: not enough mUSDC and the faucet did not top up');
+  const pick = candidates[0];
+  console.log(`auto-open: ${pick.pool} at ${pick.progress}%`);
+  await openMarket(new PublicKey(pick.pool), secs, seed);
+}
+
+async function main() {
+  const [cmd, ...a] = process.argv.slice(2);
+  console.log(`wallet ${signer.publicKey.toBase58()} ${(await conn.getBalance(signer.publicKey)) / 1e9} SOL`);
+
+  if (cmd === 'find') {
+    for (const p of await recentPools()) console.log(`${p.pool}  ${p.complete ? 'COMPLETE' : 'open'}  ${p.progress}% of threshold`);
+    return;
+  }
+
+  if (cmd === 'open') {
+    await openMarket(new PublicKey(a[0]), Number(a[1]), units(a[2]), Number(a[3] ?? 5000));
     return;
   }
 
   if (cmd === 'keep') {
     const all = await listBindings();
     const now = BigInt(Math.floor(Date.now() / 1000));
+    const live: Binding[] = [];
     for (const { pubkey } of all) {
       const b = await fetchBinding(pubkey);
+      if (!b.halted && !b.resolved && now <= b.deadline) live.push(b);
       const st = await poolStatus(b.pool);
       const known = !!st?.complete || now > b.deadline;
       const step = b.settled ? null : b.resolved ? 'settle' : !b.halted ? (known ? 'halt' : null) : now >= b.deadline ? 'resolve' : null;
@@ -206,6 +255,9 @@ async function main() {
       } catch (e) {
         console.log(`${pubkey.toBase58()}  ${step} failed: ${(e as Error).message.split('\n')[0]}`);
       }
+    }
+    if (process.env.AUTO_OPEN === '1') {
+      try { await autoOpen(live); } catch (e) { console.log(`auto-open failed: ${(e as Error).message.split('\n')[0]}`); }
     }
     return;
   }
