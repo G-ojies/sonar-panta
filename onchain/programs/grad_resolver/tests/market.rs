@@ -234,6 +234,32 @@ impl Fx {
         self.resolve_with(self.pool)
     }
 
+    fn settle(&mut self) -> Result<(), String> {
+        let caller = fund(&mut self.svm);
+        send(
+            &mut self.svm,
+            self.pid,
+            grad_resolver::instruction::Settle {}.data(),
+            grad_resolver::accounts::Settle {
+                binding: self.binding,
+                authority: self.authority,
+                pm_market: self.pm_market,
+                collateral_mint: self.mint,
+                yes_mint: self.yes_mint,
+                no_mint: self.no_mint,
+                pm_vault: self.pm_vault,
+                authority_collateral: self.collateral,
+                authority_yes: self.auth_yes,
+                authority_no: self.auth_no,
+                opener_collateral: self.opener_tok,
+                pm_amm_program: PM,
+                token_program: TOKEN_PROGRAM,
+            }
+            .to_account_metas(None),
+            &[&caller],
+        )
+    }
+
     /// A trader buying YES with `amount` collateral straight through pm-AMM.
     fn buy_yes(&mut self, amount: u64) -> Result<(), String> {
         let trader = fund(&mut self.svm);
@@ -422,6 +448,8 @@ fn resolve_yes_waits_for_pm_end_then_settles_from_the_pool() {
     fx.open().unwrap();
     fx.set_pool(PoolSpec { finish_curve_timestamp: (NOW + 60) as u64, ..PoolSpec::open(fx.config) });
     fx.time(NOW + 120);
+    assert_fails_with(fx.resolve(), "NotHalted");
+    fx.halt().unwrap();
     // The outcome is known, but pm-AMM only resolves at its end_ts.
     assert_fails_with(fx.resolve(), "MarketNotExpired");
 
@@ -436,8 +464,12 @@ fn resolve_yes_waits_for_pm_end_then_settles_from_the_pool() {
 fn resolve_no_when_the_deadline_passes_first() {
     let mut fx = Fx::new();
     fx.open().unwrap();
-    assert_fails_with(fx.resolve(), "NotYet");
+    assert_fails_with(fx.halt(), "NotYet");
+    // At the deadline itself the curve can still finish in time.
+    fx.time(fx.deadline);
+    assert_fails_with(fx.halt(), "NotYet");
     fx.time(fx.deadline + 1);
+    fx.halt().unwrap();
     fx.resolve().expect("resolve");
     assert_eq!(pm_resolution(&fx.pm_market_data()), (true, PM_WON_NO));
 }
@@ -450,6 +482,51 @@ fn resolve_rejects_a_foreign_pool() {
     let decoy = Pubkey::new_unique();
     set_pool(&mut fx.svm, decoy, &PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
     assert_fails_with(fx.resolve_with(decoy), "MarketMismatch");
+}
+
+// ---------------------------------------------------------------------------
+// settle
+// ---------------------------------------------------------------------------
+
+#[test]
+fn settle_returns_the_lp_and_creator_fees_to_the_opener() {
+    let mut fx = Fx::new();
+    fx.open().unwrap();
+    fx.buy_yes(10 * UNIT).unwrap();
+    let fee = fx.balance(&fx.collateral);
+    assert!(fee > 0);
+
+    fx.set_pool(PoolSpec { is_migrated: 1, ..PoolSpec::open(fx.config) });
+    fx.halt().unwrap();
+    assert_fails_with(fx.settle(), "NotResolved");
+    fx.time(fx.deadline);
+    fx.resolve().unwrap();
+
+    let before = fx.balance(&fx.opener_tok);
+    fx.settle().expect("settle");
+    let back = fx.balance(&fx.opener_tok) - before;
+    // The LP sold YES to the trader, so it holds mostly NO and gets back less
+    // than its seed, plus the fee. It never gets more than the vault held.
+    assert!(back > fee, "opener got {back}, fee alone was {fee}");
+    assert!(back <= SEED + 10 * UNIT, "opener got {back}");
+    assert_eq!(fx.balance(&fx.collateral), 0);
+    assert!(fx.binding().settled);
+    // pm-AMM closes the claimed outcome-token accounts, so a second settle
+    // fails on those accounts even before the `AlreadySettled` check.
+    assert!(fx.settle().is_err());
+}
+
+#[test]
+fn settle_with_no_trades_returns_the_whole_seed() {
+    let mut fx = Fx::new();
+    fx.open().unwrap();
+    fx.time(fx.deadline + 1);
+    fx.halt().unwrap();
+    fx.resolve().unwrap();
+    fx.settle().expect("settle");
+    // pm-AMM rounds in its own favour; allow a few base units of dust.
+    let got = fx.balance(&fx.opener_tok);
+    assert!(got <= 10 * SEED && got + 1_000 >= 10 * SEED, "opener has {got}");
 }
 
 // ---------------------------------------------------------------------------

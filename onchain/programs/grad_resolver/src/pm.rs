@@ -16,6 +16,7 @@ pub const INITIALIZE_MARKET_DISCRIMINATOR: [u8; 8] = [35, 35, 189, 193, 155, 48,
 pub const DEPOSIT_LIQUIDITY_DISCRIMINATOR: [u8; 8] = [245, 99, 59, 25, 151, 71, 233, 249];
 pub const WITHDRAW_LIQUIDITY_DISCRIMINATOR: [u8; 8] = [149, 158, 33, 185, 47, 243, 253, 31];
 pub const RESOLVE_MARKET_DISCRIMINATOR: [u8; 8] = [155, 23, 80, 173, 46, 74, 23, 239];
+pub const CLAIM_WINNINGS_DISCRIMINATOR: [u8; 8] = [161, 215, 24, 59, 14, 236, 242, 221];
 
 pub const MARKET_DISCRIMINATOR: [u8; 8] = [219, 190, 213, 55, 0, 227, 198, 154];
 pub const LP_POSITION_DISCRIMINATOR: [u8; 8] = [105, 241, 37, 200, 224, 2, 252, 90];
@@ -175,6 +176,20 @@ pub fn resolve_market_ix(signer: &AccountInfo, market: &AccountInfo, side: u8) -
     Instruction {
         program_id: PM_AMM_PROGRAM_ID,
         accounts: vec![meta(signer, false, true), meta(market, true, false)],
+        data,
+    }
+}
+
+/// Accounts in IDL order: signer (w, s), market, collateral_mint, yes_mint (w),
+/// no_mint (w), vault (w), user_yes (w), user_no (w), user_collateral (w),
+/// token_program. pm-AMM ignores `amount` and claims the whole winning balance.
+pub fn claim_winnings_ix(accounts: &[AccountInfo; 10]) -> Instruction {
+    let w = [true, false, false, true, true, true, true, true, true, false];
+    let mut data = CLAIM_WINNINGS_DISCRIMINATOR.to_vec();
+    data.extend_from_slice(&0u64.to_le_bytes());
+    Instruction {
+        program_id: PM_AMM_PROGRAM_ID,
+        accounts: accounts.iter().zip(w).enumerate().map(|(i, (a, w))| meta(a, w, i == 0)).collect(),
         data,
     }
 }

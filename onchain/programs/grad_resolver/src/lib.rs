@@ -11,7 +11,11 @@
 //!   market has no liquidity, so trading stops as soon as the answer is public
 //!   instead of letting informed traders drain the LP until `end_ts`.
 //! - `resolve` is permissionless after the deadline and resolves with the side
-//!   the pool account decides, using `curve_market::decide`.
+//!   the pool account decides, using `curve_market::decide`. It needs the
+//!   market halted first: pm-AMM refuses LP withdrawals once resolved.
+//! - `settle` is permissionless after resolution: it claims the PDA's winning
+//!   outcome tokens and sends all of the PDA's collateral (winnings and creator
+//!   fees) to the opener.
 //!
 //! The PDA is the pm-AMM market creator, so the creator half of the swap fee
 //! lands in its collateral account.
@@ -82,6 +86,12 @@ pub enum ResolverError {
     MarketMismatch,
     #[msg("The account is not a pm-AMM account of the expected type")]
     NotPmAmmAccount,
+    #[msg("Halt the market before resolving it")]
+    NotHalted,
+    #[msg("The market has not been resolved")]
+    NotResolved,
+    #[msg("The market has already been settled")]
+    AlreadySettled,
 }
 
 #[account]
@@ -107,6 +117,8 @@ pub struct Binding {
     /// Liquidity withdrawn because the outcome became known.
     pub halted: bool,
     pub resolved: bool,
+    /// Proceeds sent to the opener.
+    pub settled: bool,
     pub bump: u8,
     pub authority_bump: u8,
 }
@@ -129,6 +141,13 @@ pub struct MarketHalted {
     pub outcome: Side,
     pub shares_withdrawn: u128,
     pub at: i64,
+}
+
+#[event]
+pub struct MarketSettled {
+    pub binding: Pubkey,
+    pub opener: Pubkey,
+    pub amount: u64,
 }
 
 #[event]
@@ -268,6 +287,7 @@ pub mod grad_resolver {
         binding.seed_amount = seed_amount;
         binding.halted = false;
         binding.resolved = false;
+        binding.settled = false;
         binding.bump = ctx.bumps.binding;
         binding.authority_bump = authority_bump;
 
@@ -346,6 +366,7 @@ pub mod grad_resolver {
         let now = Clock::get()?.unix_timestamp;
         let binding = &ctx.accounts.binding;
         require!(!binding.resolved, ResolverError::AlreadyResolved);
+        require!(binding.halted, ResolverError::NotHalted);
 
         let (pool, _) = dbc::read_pool_and_config(&ctx.accounts.pool, &ctx.accounts.config)?;
         let outcome = decide(&pool, binding.migration_quote_threshold, binding.deadline_ts, now)
@@ -368,6 +389,62 @@ pub mod grad_resolver {
             outcome,
             at: now,
         });
+        Ok(())
+    }
+
+    /// Claim the PDA's winning outcome tokens and send all of its collateral
+    /// (winnings plus creator fees) to the opener. Anyone can call it.
+    pub fn settle(ctx: Context<Settle>) -> Result<()> {
+        let binding = &ctx.accounts.binding;
+        require!(binding.resolved, ResolverError::NotResolved);
+        require!(!binding.settled, ResolverError::AlreadySettled);
+
+        let binding_key = binding.key();
+        let signer_seeds: &[&[u8]] = &[AUTHORITY_SEED, binding_key.as_ref(), &[binding.authority_bump]];
+        let a = &ctx.accounts;
+
+        if a.authority_yes.amount > 0 || a.authority_no.amount > 0 {
+            let view = pm::read_market(&a.pm_market)?;
+            require_keys_eq!(view.vault, a.pm_vault.key(), ResolverError::MarketMismatch);
+            let claim_accounts = [
+                a.authority.to_account_info(),
+                a.pm_market.to_account_info(),
+                a.collateral_mint.to_account_info(),
+                a.yes_mint.to_account_info(),
+                a.no_mint.to_account_info(),
+                a.pm_vault.to_account_info(),
+                a.authority_yes.to_account_info(),
+                a.authority_no.to_account_info(),
+                a.authority_collateral.to_account_info(),
+                a.token_program.to_account_info(),
+            ];
+            invoke_signed(
+                &pm::claim_winnings_ix(&claim_accounts),
+                &[&claim_accounts[..], &[a.pm_amm_program.to_account_info()]].concat(),
+                &[signer_seeds],
+            )?;
+        }
+
+        ctx.accounts.authority_collateral.reload()?;
+        let amount = ctx.accounts.authority_collateral.amount;
+        if amount > 0 {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.key(),
+                    Transfer {
+                        from: ctx.accounts.authority_collateral.to_account_info(),
+                        to: ctx.accounts.opener_collateral.to_account_info(),
+                        authority: ctx.accounts.authority.to_account_info(),
+                    },
+                    &[signer_seeds],
+                ),
+                amount,
+            )?;
+        }
+
+        let binding = &mut ctx.accounts.binding;
+        binding.settled = true;
+        emit!(MarketSettled { binding: binding_key, opener: binding.opener, amount });
         Ok(())
     }
 }
@@ -543,4 +620,50 @@ pub struct Resolve<'info> {
     /// CHECK: address pinned.
     #[account(address = pm::PM_AMM_PROGRAM_ID)]
     pub pm_amm_program: UncheckedAccount<'info>,
+}
+
+#[derive(Accounts)]
+pub struct Settle<'info> {
+    #[account(
+        mut,
+        seeds = [BINDING_SEED, binding.pool.as_ref(), &binding.deadline_ts.to_le_bytes()],
+        bump = binding.bump,
+        has_one = pm_market @ ResolverError::MarketMismatch,
+        has_one = collateral_mint @ ResolverError::MarketMismatch,
+    )]
+    pub binding: Box<Account<'info, Binding>>,
+
+    /// pm-AMM marks the claim signer writable.
+    #[account(mut, seeds = [AUTHORITY_SEED, binding.key().as_ref()], bump = binding.authority_bump)]
+    pub authority: SystemAccount<'info>,
+
+    /// CHECK: must equal `binding.pm_market`; read with `pm::read_market`.
+    pub pm_market: UncheckedAccount<'info>,
+    pub collateral_mint: Box<Account<'info, Mint>>,
+    #[account(mut, address = authority_yes.mint @ ResolverError::MarketMismatch)]
+    pub yes_mint: Box<Account<'info, Mint>>,
+    #[account(mut, address = authority_no.mint @ ResolverError::MarketMismatch)]
+    pub no_mint: Box<Account<'info, Mint>>,
+    /// CHECK: checked against the market's vault before the claim; pm-AMM checks it too.
+    #[account(mut)]
+    pub pm_vault: UncheckedAccount<'info>,
+
+    #[account(mut, seeds = [COLLATERAL_SEED, binding.key().as_ref()], bump)]
+    pub authority_collateral: Box<Account<'info, TokenAccount>>,
+    #[account(mut, seeds = [YES_SEED, binding.key().as_ref()], bump)]
+    pub authority_yes: Box<Account<'info, TokenAccount>>,
+    #[account(mut, seeds = [NO_SEED, binding.key().as_ref()], bump)]
+    pub authority_no: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        mut,
+        token::mint = collateral_mint,
+        constraint = opener_collateral.owner == binding.opener @ ResolverError::MarketMismatch,
+    )]
+    pub opener_collateral: Box<Account<'info, TokenAccount>>,
+
+    /// CHECK: address pinned.
+    #[account(address = pm::PM_AMM_PROGRAM_ID)]
+    pub pm_amm_program: UncheckedAccount<'info>,
+    pub token_program: Program<'info, Token>,
 }

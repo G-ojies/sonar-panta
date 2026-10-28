@@ -21,30 +21,35 @@ decides graduation on chain (`curve_market`, `decide`). The new program puts the
   tie, pool not complete), then CPIs pm-AMM `initialize_market` with a program PDA as
   `authority` and `end_ts = deadline`, and seeds liquidity from the PDA's own treasury via
   `deposit_liquidity`. Stores a `Binding { pool, config, pm_market, deadline, threshold }`.
-- `halt_on_outcome()`: permissionless. If `decide()` says the outcome is known (the curve
+- `halt()`: permissionless. If `decide()` says the outcome is known (the curve
   completed, or the deadline passed), withdraws the PDA's whole LP position. pm-AMM refuses
   swaps once `l_zero` is zero, so trading stops the moment the answer is public. This is the
   AMM form of the bug KupiaSec reported in `curve_market` (stakes after graduation).
-- `resolve()`: permissionless, after `end_ts`. Reads the pool again and CPIs `resolve_market`
-  signed by the PDA with the side `decide()` returns.
+- `resolve()`: permissionless, after `end_ts`, and only once halted (pm-AMM refuses LP
+  withdrawals after resolution). Reads the pool again and CPIs `resolve_market` signed by the
+  PDA with the side `decide()` returns.
+- `settle()`: permissionless, after resolution. Claims the PDA's winning outcome tokens and sends
+  all of its collateral (winnings plus creator fees) to the opener.
 - The PDA is the market creator, so it receives the creator half of pm-AMM's 2% swap fee. That
   is the business model: protocol-owned liquidity that earns fees and cannot be rugged by a
   resolver key.
 
 Residual risk, stated plainly: a trade landing in the same block as the swap that graduates the
 pool, before the halt crank. The trader pays for the graduating swap; the keeper bot calls
-`halt_on_outcome` on the pool's next account change.
+`halt` on the pool's next account change.
 
 ### Status (28 October)
 
-`onchain/programs/grad_resolver` builds and its 10 LiteSVM tests pass against the real pm-AMM and
+`onchain/programs/grad_resolver` builds and its 12 LiteSVM tests pass against the real pm-AMM and
 Metaplex binaries (`onchain/scripts/fetch-test-programs.sh` dumps them from mainnet; pm-AMM's
 mainnet build is the devnet build). Covered: the pm-AMM market is created with the binding PDA as
 authority and seeded; a trader can buy before graduation and the PDA earns the creator fee;
 `halt` is refused while the question is open, works on each completion signal and after the
 deadline, and afterwards pm-AMM refuses a 900-unit informed YES buy with `InsufficientLiquidity`;
 `resolve` waits for pm-AMM's `end_ts`, then resolves YES or NO from the pool; foreign pools and
-markets are refused; every pm-AMM offset and discriminator is checked against its IDL.
+markets are refused; `settle` returns the LP and the creator fees to the opener (the whole seed,
+less pm-AMM's rounding dust, when nobody traded); every pm-AMM offset and discriminator is
+checked against its IDL.
 
 pm-AMM is called by hand-built instructions (`src/pm.rs`), not `declare_program!`: the workspace
 pins `anchor-lang` 1.0.2 while the macro crates resolve to 1.2.1, and the generated CPI client
@@ -52,17 +57,16 @@ references a type 1.0.2 lacks. Bumping Anchor would change the deployed `curve_m
 
 Costs: `open_market` uses about 660k compute units (pm-AMM's first deposit alone is over 400k),
 so clients must request a 1.4M budget; it moves 0.06 SOL to the market's PDA for pm-AMM's rent.
-`halt` about 91k, `resolve` about 23k.
+`halt` about 95k, `resolve` about 18k, `settle` about 89k.
 
-Not done yet: `settle` (return the PDA's withdrawn outcome tokens, winnings and creator fees to
-the opener after resolution), devnet deploy, keeper, web.
+Not done yet: devnet deploy, keeper, web.
 
 ### Off chain (existing Sonar pieces)
 
 - Sonar Curve already decodes the DBC tape and measures distance to graduation. It picks which
   launches get a market (enough momentum to be a real question) and shows the signal next to
   the price.
-- A keeper (GitHub Actions or the Render process) opens markets, cranks `halt_on_outcome` and
+- A keeper (GitHub Actions or the Render process) opens markets, cranks `halt` and
   `resolve`.
 - `/curve` pool page: pm-AMM price, trade box (SDK `@pm-amm/sdk`), LP warning, halt and
   resolution state.
