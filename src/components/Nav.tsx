@@ -6,6 +6,7 @@ const items = [
   { href: '/', label: 'Radar', match: (p: string) => p === '/' || p.startsWith('/market') },
   { href: '/portfolio', label: 'Portfolio', match: (p: string) => p.startsWith('/portfolio') },
   { href: '/curve', label: 'Curve', match: (p: string) => p.startsWith('/curve') },
+  { href: '/graduation', label: 'Markets', match: (p: string) => p.startsWith('/graduation') },
   { href: '/create', label: 'Create', match: (p: string) => p.startsWith('/create') },
   { href: '/agent', label: 'Agent', match: (p: string) => p.startsWith('/agent') },
 ];
