@@ -1,0 +1,40 @@
+[package]
+name = "grad_resolver"
+version = "0.1.0"
+description = "Trustless resolver and liquidity guard for pm-AMM markets on Meteora DBC graduation"
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "grad_resolver"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+anchor-debug = []
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+anchor-lang = { version = "=1.0.2", features = ["init-if-needed"] }
+anchor-spl = "=1.0.2"
+curve_market = { path = "../curve_market", features = ["no-entrypoint"] }
+
+[dev-dependencies]
+litesvm = "0.10.0"
+solana-message = "3"
+solana-transaction = "3"
+solana-signer = "3"
+solana-keypair = "3"
+solana-pubkey = "3"
+solana-account = "3"
+solana-clock = "3"
+serde_json = "1"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

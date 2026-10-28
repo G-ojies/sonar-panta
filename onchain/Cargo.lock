@@ -1414,6 +1414,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "grad_resolver"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "curve_market",
+ "litesvm",
+ "serde_json",
+ "solana-account",
+ "solana-clock 3.2.1",
+ "solana-keypair",
+ "solana-message",
+ "solana-pubkey 3.0.0",
+ "solana-signer",
+ "solana-transaction",
+]
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

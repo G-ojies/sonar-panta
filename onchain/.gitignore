@@ -3,3 +3,5 @@ target/
 node_modules/
 test-ledger/
 *-keypair.json
+# Third-party program binaries for tests; fetched by scripts/fetch-test-programs.sh
+programs/grad_resolver/tests/fixtures/*.so
