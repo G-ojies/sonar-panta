@@ -19,7 +19,8 @@ pub enum Side {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
 pub enum MarketState {
-    /// Taking stakes until the deadline, or until the pool graduates.
+    /// Taking stakes until the deadline, or until the pool graduates. `stake`
+    /// enforces both; the state itself only changes in `resolve`.
     Open,
     /// Resolved YES: the pool graduated before the deadline. YES stakes win.
     ResolvedYes,

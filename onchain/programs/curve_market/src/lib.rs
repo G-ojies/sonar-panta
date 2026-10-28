@@ -173,12 +173,22 @@ pub mod curve_market {
     /// Move `amount` of the quote token into the vault on `side`. The amount
     /// credited is what the vault actually received, so a Token-2022 transfer
     /// fee cannot inflate a position.
+    ///
+    /// Stakes close when the curve completes, not only at the deadline: the
+    /// market stays `Open` until someone calls `resolve`, and a stake taken
+    /// after graduation would already know YES has won.
     pub fn stake(ctx: Context<Stake>, side: Side, amount: u64) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let market = &mut ctx.accounts.market;
         require!(market.is_open(), CurveError::MarketNotOpen);
         require!(now <= market.deadline_ts, CurveError::DeadlinePassed);
         require!(amount >= MIN_STAKE, CurveError::StakeTooSmall);
+
+        let (pool, _) = dbc::read_pool_and_config(&ctx.accounts.pool, &ctx.accounts.config)?;
+        require!(
+            !pool.curve_complete(market.migration_quote_threshold),
+            CurveError::PoolAlreadyComplete
+        );
 
         let before = ctx.accounts.vault.amount;
         token_interface::transfer_checked(
@@ -413,8 +423,16 @@ pub struct Stake<'info> {
         has_one = quote_mint @ CurveError::QuoteMintMismatch,
         has_one = vault @ CurveError::VaultMismatch,
         has_one = token_program @ CurveError::QuoteMintOwner,
+        has_one = pool @ CurveError::PoolMismatch,
+        has_one = config @ CurveError::ConfigMismatch,
     )]
     pub market: Box<Account<'info, Market>>,
+
+    /// CHECK: must equal `market.pool`; owner and layout verified in `dbc::read_pool`.
+    pub pool: UncheckedAccount<'info>,
+
+    /// CHECK: must equal `market.config`; owner and layout verified in `dbc::read_config`.
+    pub config: UncheckedAccount<'info>,
 
     #[account(
         init_if_needed,

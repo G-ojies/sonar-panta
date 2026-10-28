@@ -125,7 +125,7 @@ test('instruction accounts follow the IDL order and flags', () => {
   const [position] = positionPda(market, user);
   const ata = associatedTokenAddress(user, NATIVE_MINT);
   const stake = stakeIx(user, m, ata, 'no', 5n);
-  assert.deepEqual(keysOf(stake), [`${USER}:sw`, `${market.toBase58()}:-w`, `${position.toBase58()}:-w`, `${NATIVE_MINT}:--`, `${ata.toBase58()}:-w`, `${vault.toBase58()}:-w`, `${TOKEN_PROGRAM}:--`, '11111111111111111111111111111111:--']);
+  assert.deepEqual(keysOf(stake), [`${USER}:sw`, `${market.toBase58()}:-w`, `${POOL}:--`, `${CONFIG}:--`, `${position.toBase58()}:-w`, `${NATIVE_MINT}:--`, `${ata.toBase58()}:-w`, `${vault.toBase58()}:-w`, `${TOKEN_PROGRAM}:--`, '11111111111111111111111111111111:--']);
   assert.equal(stake.keys.length, names('stake').length);
   assert.equal(stake.data[8], 1);
 
