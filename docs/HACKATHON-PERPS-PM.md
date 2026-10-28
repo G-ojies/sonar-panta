@@ -71,7 +71,11 @@ paid the PDA 0.05 mUSDC of creator fee; `halt` answered `NotYet` while the pool 
 The RPC comes from `SOLANA_DEVNET_RPC` in `.env.local` (an Alchemy devnet key); the public
 endpoints rate-limit program deploys.
 
-Not done yet: run `keep` on a schedule, web.
+Keeper: `.github/workflows/grad-keeper.yml` runs `keep` every 10 minutes from `main` with a
+separate keeper wallet (`9gjTFjRFxoQtzt3z5xb6YFMMnc9yBEJ5HGuPB1Lknqsn`, 0.5 devnet SOL). Repo
+secrets: `GRAD_KEEPER_KEYPAIR` (the keypair JSON) and `SOLANA_DEVNET_RPC`.
+
+Not done yet: web.
 
 ### Off chain (existing Sonar pieces)
 
