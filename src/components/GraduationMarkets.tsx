@@ -43,8 +43,10 @@ export function GraduationMarkets({ initial }: { initial: GradPayload | null }) 
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<{ sig: string; what: string } | null>(null);
   const [faucet, setFaucet] = useState<'idle' | 'asking' | 'ok' | string>('idle');
-  const [now, setNow] = useState(() => Date.now() / 1000);
-  useEffect(() => { const t = setInterval(() => setNow(Date.now() / 1000), 10_000); return () => clearInterval(t); }, []);
+  // null until mounted: times and countdowns depend on the browser's clock and time zone, so they are left out of
+  // the server render (otherwise React reports a hydration mismatch).
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => { setNow(Date.now() / 1000); const t = setInterval(() => setNow(Date.now() / 1000), 10_000); return () => clearInterval(t); }, []);
 
   const current = markets.find((m) => m.binding.address === selected) ?? markets[0] ?? null;
   const busy = step !== 'idle';
@@ -119,7 +121,7 @@ export function GraduationMarkets({ initial }: { initial: GradPayload | null }) 
             onSwap={(direction, amountRaw) => send(`${direction.startsWith('buy') ? 'Bought' : 'Sold'} ${direction.endsWith('Yes') ? 'YES' : 'NO'}`, async (lib) => lib.swapPlan(publicKey!, current.binding.address, current.pm!, direction, amountRaw))}
             onClaim={() => send('Winnings claimed', async (lib) => lib.claimPlan(publicKey!, current.binding.address, current.pm!))}
           />}
-          <OpenMarket wallet={wallet ?? null} busy={busy} step={step} now={now}
+          <OpenMarket wallet={wallet ?? null} busy={busy} step={step} now={now ?? Date.now() / 1000}
             onOpen={(pool, deadline, seedRaw) => send('Market opened', async (lib) => {
               const [w3, dbc] = await Promise.all([import('@solana/web3.js'), import('@/lib/dbc')]);
               const acc = await new w3.Connection(lib.GRAD_RPC, 'confirmed').getAccountInfo(new w3.PublicKey(pool));
@@ -150,13 +152,15 @@ export function GraduationMarkets({ initial }: { initial: GradPayload | null }) 
   );
 }
 
-function MarketCard({ m, now, selected, holding, onSelect }: { m: GradMarketView; now: number; selected: boolean; holding: { yesRaw: string; noRaw: string } | null; onSelect: () => void }) {
-  const left = m.binding.deadlineTs - now;
+const clock = (ts: number) => `${dateShort(ts)} ${new Date(ts * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+
+function MarketCard({ m, now, selected, holding, onSelect }: { m: GradMarketView; now: number | null; selected: boolean; holding: { yesRaw: string; noRaw: string } | null; onSelect: () => void }) {
+  const left = now === null ? null : m.binding.deadlineTs - now;
   const phase = PHASE[m.phase];
   return (
     <button type="button" onClick={onSelect} aria-pressed={selected} className={`card w-full p-4 text-left transition-colors ${selected ? '!border-ping/50' : 'hover:!border-fog-2'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className="text-paper">Pool <span className="mono">{short(m.binding.pool, 5)}</span> graduates by {dateShort(m.binding.deadlineTs)} {new Date(m.binding.deadlineTs * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}?</span>
+        <span className="text-paper">Pool <span className="mono">{short(m.binding.pool, 5)}</span> graduates by {now === null ? 'the deadline' : clock(m.binding.deadlineTs)}?</span>
         <span className={`chip ${phase.tone}`}>{phase.label}</span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -171,7 +175,7 @@ function MarketCard({ m, now, selected, holding, onSelect }: { m: GradMarketView
       )}
       <div className="mono mt-2 flex flex-wrap gap-x-3 text-[11px] text-fog-2">
         <span>{fmt(m.vaultRaw, 0)} mUSDC in the vault</span>
-        <span>{m.phase === 'trading' ? `${ago(left)} left` : left > 0 ? `deadline in ${ago(left)}` : `deadline ${ago(-left)} ago`}</span>
+        {left !== null && <span>{m.phase === 'trading' ? `${ago(left)} left` : left > 0 ? `deadline in ${ago(left)}` : `deadline ${ago(-left)} ago`}</span>}
         {holding && <span className="text-paper">you: {fmt(holding.yesRaw)} YES · {fmt(holding.noRaw)} NO</span>}
       </div>
     </button>
@@ -253,7 +257,7 @@ function OpenMarket({ wallet, busy, step, now, onOpen }: { wallet: string | null
           <input id="seed" className="field mono" type="number" min="1" step="1" value={seed} onChange={(e) => setSeed(e.target.value)} />
         </div>
         <p className="text-[11px] text-fog-2">
-          Opens at 50¢ and resolves YES if the curve fills by {dateShort(deadline)} {new Date(deadline * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}.
+          Opens at 50¢ and resolves YES if the curve fills by {clock(deadline)}.
           You seed the liquidity and earn the market&apos;s half of the fee; after resolution the keeper returns what is left to you. Costs about 0.07 devnet SOL of rent.
         </p>
         <div className="flex gap-2">
