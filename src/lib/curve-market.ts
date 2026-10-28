@@ -175,11 +175,11 @@ export function createMarketIx(creator: PublicKey, keys: MarketKeys, deadlineTs:
   return { ix, market, vault };
 }
 
-export function stakeIx(user: PublicKey, m: Pick<MarketAccount, 'address' | 'quoteMint' | 'tokenProgram' | 'vault'>, userToken: PublicKey, side: Side, amount: bigint, program = CURVE_MARKET_PROGRAM): TransactionInstruction {
+export function stakeIx(user: PublicKey, m: Pick<MarketAccount, 'address' | 'pool' | 'config' | 'quoteMint' | 'tokenProgram' | 'vault'>, userToken: PublicKey, side: Side, amount: bigint, program = CURVE_MARKET_PROGRAM): TransactionInstruction {
   const [position] = positionPda(m.address, user, program);
   return new TransactionInstruction({
     programId: pk(program),
-    keys: [meta(user, true, true), meta(pk(m.address), true), meta(position, true), meta(pk(m.quoteMint)), meta(userToken, true), meta(pk(m.vault), true), meta(pk(m.tokenProgram)), meta(SYSTEM)],
+    keys: [meta(user, true, true), meta(pk(m.address), true), meta(pk(m.pool)), meta(pk(m.config)), meta(position, true), meta(pk(m.quoteMint)), meta(userToken, true), meta(pk(m.vault), true), meta(pk(m.tokenProgram)), meta(SYSTEM)],
     data: Buffer.from(encodeStake(side, amount)),
   });
 }
@@ -224,7 +224,7 @@ export function closeAccountIx(account: PublicKey, destination: PublicKey, owner
  * into it and synced, then staked; when the ATA was created here it is closed again afterwards so no SOL is left
  * wrapped. With any other mint the user's ATA must already hold the amount.
  */
-export function stakePlan(user: PublicKey, m: Pick<MarketAccount, 'address' | 'quoteMint' | 'tokenProgram' | 'vault'>, side: Side, amount: bigint, ataExists: boolean, program = CURVE_MARKET_PROGRAM): TransactionInstruction[] {
+export function stakePlan(user: PublicKey, m: Pick<MarketAccount, 'address' | 'pool' | 'config' | 'quoteMint' | 'tokenProgram' | 'vault'>, side: Side, amount: bigint, ataExists: boolean, program = CURVE_MARKET_PROGRAM): TransactionInstruction[] {
   const mint = new PublicKey(m.quoteMint), tokenProgram = new PublicKey(m.tokenProgram);
   const ata = associatedTokenAddress(user, mint, tokenProgram);
   const ixs: TransactionInstruction[] = [];

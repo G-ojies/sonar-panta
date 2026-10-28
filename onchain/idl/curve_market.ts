@@ -309,7 +309,11 @@ export type CurveMarket = {
       "docs": [
         "Move `amount` of the quote token into the vault on `side`. The amount",
         "credited is what the vault actually received, so a Token-2022 transfer",
-        "fee cannot inflate a position."
+        "fee cannot inflate a position.",
+        "",
+        "Stakes close when the curve completes, not only at the deadline: the",
+        "market stays `Open` until someone calls `resolve`, and a stake taken",
+        "after graduation would already know YES has won."
       ],
       "discriminator": [
         206,
@@ -355,6 +359,18 @@ export type CurveMarket = {
               }
             ]
           }
+        },
+        {
+          "name": "pool",
+          "relations": [
+            "market"
+          ]
+        },
+        {
+          "name": "config",
+          "relations": [
+            "market"
+          ]
         },
         {
           "name": "position",

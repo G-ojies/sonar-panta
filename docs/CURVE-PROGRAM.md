@@ -9,7 +9,7 @@ Parimutuel YES/NO markets on one question: will a Meteora Dynamic Bonding Curve 
 | Source | `onchain/programs/curve_market/` |
 | Framework | Anchor 1.0.2 (CLI 1.0.1), solana-cli 3.1.14, platform-tools v1.52 |
 | Binary | 265,480 bytes (`opt-level = "z"`); the devnet deployment is the 264,064-byte build from before transfer-hook pools, see [Deploy](#deploy) |
-| Tests | 72 (`cd onchain && cargo test`), LiteSVM, no network |
+| Tests | 75 (`cd onchain && cargo test`), LiteSVM, no network |
 
 ## How the DBC pool is read
 
@@ -70,9 +70,9 @@ Emits `MarketCreated`.
 
 ### `stake(side: Side, amount: u64)`
 
-Accounts: `user` (signer), `market`, `position` (init if needed), `quote_mint`, `user_token` (owned by `user`, same mint), `vault`, `token_program`, `system_program`.
+Accounts: `user` (signer), `market`, `pool` and `config` (must equal the keys stored in the market), `position` (init if needed), `quote_mint`, `user_token` (owned by `user`, same mint), `vault`, `token_program`, `system_program`.
 
-Rejected if the market is not `Open`, if the clock is past the deadline, or if `amount` is below `MIN_STAKE` (1,000,000 base units: 0.001 SOL or 1 USDC). The transfer uses `transfer_checked`. The amount credited is the vault balance after minus before, not the requested amount, so a Token-2022 transfer fee reduces the stake instead of inflating a claim.
+Rejected if the market is not `Open`, if the clock is past the deadline, if the pool's curve is already complete (`PoolAlreadyComplete`, the same test `create_market` uses: migrated, `finish_curve_timestamp` set, or quote reserve at the threshold), or if `amount` is below `MIN_STAKE` (1,000,000 base units: 0.001 SOL or 1 USDC). The transfer uses `transfer_checked`. The amount credited is the vault balance after minus before, not the requested amount, so a Token-2022 transfer fee reduces the stake instead of inflating a claim.
 
 Emits `Staked`.
 
@@ -110,7 +110,7 @@ The product is computed in u128 and floored. Losers get a payout of zero and sti
             create_market
                  |
                  v
-              [Open] --stake (until deadline)--> [Open]
+              [Open] --stake (until deadline or curve complete)--> [Open]
                  |
       resolve, both sides staked         resolve, a side is empty
         |                 |                        |
@@ -142,6 +142,8 @@ These must hold on every account at every point. The tests check each one.
 
 **Two pool kinds.** Accepting `TransferHookPool` widens what a DBC-owned account may be, so the checks stay exact rather than loose: the discriminator must be one of the two pool discriminators (no other DBC account, such as a config, metadata or operator account, passes; `parse_rejects_every_other_dbc_account` walks every account type in the IDL), the length is checked per kind, and a pool and config of different kinds are refused with `PoolKindMismatch` even though the DBC never creates such a pair, so a config of one kind can never be read through a pool of the other. The fields read are the same `PoolState` and `PoolConfig` bytes in both kinds, pinned against the IDL for each. The base mint's transfer hook is irrelevant to the market: stakes and payouts move the quote mint only, and the hook runs only when the base token moves, inside the DBC. The pool kind is not stored in the `Market` (the account layout is unchanged); `resolve` reads it again from the discriminator, which the DBC never changes for an existing account.
 
+**Staking after the outcome is known.** The market stays `Open` until someone calls `resolve`, so `stake` re-reads the pool and refuses once the curve is complete. Without that check a trader could watch for graduation, stake a large YES and call `resolve` in the same transaction, taking most of the NO side from traders who staked while the outcome was open. Reported by KupiaSec on 28 October 2026; `stake_rejects_after_graduation` covers each completion signal for both pool kinds. What remains is the ordinary parimutuel edge: a stake placed in the same block as the buy that graduates the pool, which costs the trader that buy.
+
 **Clock.** `Clock::get()` is validator time and can drift by a few seconds. Deadlines are compared with it in `create_market`, `stake` and `resolve`. The curve completion time comes from `finish_curve_timestamp`, which the DBC program wrote from the same clock, so YES versus NO at the boundary is consistent within the chain's own clock. Traders should treat the last minute before a deadline as uncertain.
 
 **Front-running `resolve`.** The common 11.51 SOL SOL-quoted config can fill in minutes once a curve is close. Near the deadline a trader holding YES can push the final swap through the DBC and then resolve YES in the same slot; a NO holder cannot stop that except by resolving NO first, which only works once the clock passes the deadline. This is not an exploit of the program, it is the market pricing a race, but it means a deadline minutes away from a near-complete curve is a bad market to join. `resolve` reads the pool in the same transaction, so the order of a last swap and a resolve inside one slot is decided by the leader. Branch 1 of the decision is unaffected by ordering: once `finish_curve_timestamp` is set the result is fixed by that number, not by who resolved.
@@ -172,7 +174,7 @@ All tests live in `onchain/programs/curve_market/tests/` and run on the host ove
 | Decision function | `decide_timestamp_is_authoritative`, `decide_migrated_without_timestamp_is_yes`, `decide_threshold_reached_only_counts_before_deadline`, `decide_waits_then_resolves_no` | `layout.rs` |
 | Payout math | `payout_even_sides_doubles`, `payout_uneven_sides_floors_and_never_exceeds_pool`, `payout_handles_u64_scale_without_overflow`, `payout_rejects_zero_winning_total_for_nonzero_stake` | `layout.rs` |
 | Create | `create_market_stores_fields`, `create_market_allows_several_deadlines_per_pool`, `create_rejects_pool_with_wrong_owner`, `create_rejects_pool_with_wrong_discriminator`, `create_rejects_short_pool_account`, `create_rejects_migrated_or_finished_pool`, `create_rejects_config_and_mint_mismatch`, `create_rejects_bad_deadlines`, `create_rejects_mint_owned_by_other_token_program` | `market.rs` |
-| Stake | `stake_both_sides_moves_tokens_and_updates_totals`, `stake_rejects_dust_and_insufficient_balance`, `stake_rejects_after_deadline`, `stake_rejects_wrong_vault_or_mint`, `stake_rejects_after_resolve` | `market.rs` |
+| Stake | `stake_both_sides_moves_tokens_and_updates_totals`, `stake_rejects_dust_and_insufficient_balance`, `stake_rejects_after_deadline`, `stake_rejects_wrong_vault_or_mint`, `stake_rejects_after_resolve`, `stake_rejects_after_graduation`, `stake_rejects_foreign_pool_or_config` | `market.rs` |
 | Resolve | `resolve_not_yet_before_deadline`, `resolve_yes_via_is_migrated`, `resolve_yes_via_finish_curve_timestamp`, `resolve_yes_via_quote_reserve_at_threshold_before_deadline`, `resolve_no_after_deadline`, `resolve_no_when_curve_finished_after_deadline`, `resolve_rejects_foreign_pool_or_config` | `market.rs` |
 | Claim | `claim_even_sides_pays_winner_double_and_loser_nothing`, `claim_uneven_sides_is_pro_rata_and_never_overpays`, `claim_single_winner_takes_whole_pool`, `claim_refund_returns_both_sides`, `claim_pays_trader_holding_both_sides`, `claim_rejects_double_claim`, `claim_rejects_before_resolution_and_other_users_position` | `market.rs` |
 | Token-2022 | `token_2022_quote_mint_round_trip` | `market.rs` |
@@ -184,7 +186,7 @@ Run them with:
 ```
 cd onchain
 anchor build          # or: cargo build-sbf
-cargo test            # 72 tests, about four seconds once compiled
+cargo test            # 75 tests, about four seconds once compiled
 CURVE_CU=1 cargo test --test market -- --nocapture   # also prints compute units
 ```
 

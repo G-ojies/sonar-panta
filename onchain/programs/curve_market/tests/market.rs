@@ -124,6 +124,8 @@ impl Fx {
             curve_market::accounts::Stake {
                 user: user.pubkey(),
                 market: self.market,
+                pool: self.pool,
+                config: self.config,
                 position,
                 quote_mint: self.mint,
                 user_token,
@@ -375,6 +377,54 @@ fn stake_rejects_after_deadline() {
     fx.stake(&a, a_tok, Side::Yes, SOL / 2).expect("at the deadline is still open");
     fx.time(fx.deadline + 1);
     assert_err(fx.stake(&a, a_tok, Side::Yes, SOL / 2), CurveError::DeadlinePassed);
+}
+
+// The market stays Open until someone resolves it, so stake itself must
+// refuse once the curve is complete. Otherwise a trader could stake YES and
+// resolve in one transaction, already knowing the answer.
+fn stake_rejects_after_graduation_case(kind: PoolKind) {
+    let mut fx = Fx::with_kind(TOKEN_PROGRAM, kind);
+    fx.create().unwrap();
+    two_sided(&mut fx);
+    let (late, late_tok) = fx.trader(10 * SOL);
+
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
+    assert_err(fx.stake(&late, late_tok, Side::Yes, 9 * SOL), CurveError::PoolAlreadyComplete);
+
+    fx.set_pool(PoolSpec { finish_curve_timestamp: NOW as u64 - 1, ..fx.spec() });
+    assert_err(fx.stake(&late, late_tok, Side::Yes, 9 * SOL), CurveError::PoolAlreadyComplete);
+
+    fx.set_pool(PoolSpec { quote_reserve: THRESHOLD, ..fx.spec() });
+    assert_err(fx.stake(&late, late_tok, Side::Yes, 9 * SOL), CurveError::PoolAlreadyComplete);
+    assert_err(fx.stake(&late, late_tok, Side::No, 9 * SOL), CurveError::PoolAlreadyComplete);
+
+    // The honest YES staker still gets the whole NO side.
+    fx.resolve().unwrap();
+    let m = fx.market();
+    assert_eq!(m.state, MarketState::ResolvedYes);
+    assert_eq!((m.yes_total, m.no_total), (SOL, SOL));
+    assert_eq!(fx.balance(&late_tok), 10 * SOL);
+}
+both_kinds!(stake_rejects_after_graduation_case => stake_rejects_after_graduation, transfer_hook_stake_rejects_after_graduation);
+
+#[test]
+fn stake_rejects_foreign_pool_or_config() {
+    let mut fx = Fx::new(TOKEN_PROGRAM);
+    fx.create().unwrap();
+    let (a, a_tok) = fx.trader(SOL);
+    // An open look-alike pool cannot stand in for the market's graduated one.
+    let decoy = Pubkey::new_unique();
+    let open = fx.spec();
+    set_pool(&mut fx.svm, decoy, &open);
+    fx.set_pool(PoolSpec { is_migrated: 1, ..fx.spec() });
+    let real = fx.pool;
+    fx.pool = decoy;
+    assert_err(fx.stake(&a, a_tok, Side::Yes, SOL), CurveError::PoolMismatch);
+    fx.pool = real;
+    let real_config = fx.config;
+    fx.config = Pubkey::new_unique();
+    assert_err(fx.stake(&a, a_tok, Side::Yes, SOL), CurveError::ConfigMismatch);
+    fx.config = real_config;
 }
 
 #[test]
