@@ -9,7 +9,8 @@
  *   npx tsx scripts/grad-market-devnet.ts keep                                    crank every market that is due
  *
  * KEYPAIR (default ~/.config/solana/id.json) signs; RPC is where it goes (default SOLANA_DEVNET_RPC
- * from .env.local, else the public devnet endpoint). COLLATERAL defaults to pm-AMM's devnet mUSDC,
+ * from .env.local, else the public devnet endpoint). `keep` lists markets through LIST_RPC (default the
+ * public endpoints), because Alchemy's free tier refuses getProgramAccounts. COLLATERAL defaults to pm-AMM's devnet mUSDC,
  * which its faucet hands out: POST https://pm-amm-devnet.vercel.app/api/faucet {"wallet": "<pubkey>"}.
  */
 import crypto from 'crypto';
@@ -112,6 +113,23 @@ async function send(ixs: TransactionInstruction[], cu = 400_000): Promise<string
   }
 }
 
+const LIST_RPCS = process.env.LIST_RPC ? [process.env.LIST_RPC] : ['https://api.devnet.solana.com', 'https://devnet.rpcpool.com'];
+
+/** Every binding account. One getProgramAccounts call, tried on each listing endpoint in turn. */
+async function listBindings() {
+  // Binding: 8 discriminator + 5 pubkeys + 4 u64/i64 + 3 bools + 2 bumps.
+  const filters = [{ dataSize: 8 + 5 * 32 + 4 * 8 + 3 + 2 }];
+  let last: unknown;
+  for (const url of LIST_RPCS) {
+    try {
+      return await new Connection(url, 'confirmed').getProgramAccounts(GRAD, { filters, dataSlice: { offset: 0, length: 0 } });
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
 async function poolStatus(pool: PublicKey) {
   const pa = await conn.getAccountInfo(pool);
   if (!pa || !pa.owner.equals(new PublicKey(DBC_PROGRAM))) return null;
@@ -175,8 +193,7 @@ async function main() {
   }
 
   if (cmd === 'keep') {
-    // Binding: 8 discriminator + 5 pubkeys + 4 u64/i64 + 3 bools + 2 bumps.
-    const all = await conn.getProgramAccounts(GRAD, { filters: [{ dataSize: 8 + 5 * 32 + 4 * 8 + 3 + 2 }] });
+    const all = await listBindings();
     const now = BigInt(Math.floor(Date.now() / 1000));
     for (const { pubkey } of all) {
       const b = await fetchBinding(pubkey);
