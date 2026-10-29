@@ -7,8 +7,8 @@
 import { marketRpc } from './curve-market-server';
 import { decodeConfig, decodePool } from './dbc';
 import {
-  ata, BINDING_SIZE, decodeBinding, decodePmMarket, GRAD_PROGRAM, MUSDC, phaseOf, yesPrice, deriveMarket,
-  type GradBinding, type MarketPhase, type PmMarketState,
+  ata, BINDING_SIZE, decodeBinding, decodePmMarket, dueStep, GRAD_PROGRAM, MUSDC, phaseOf, yesPrice, deriveMarket,
+  type CrankStep, type GradBinding, type MarketPhase, type PmMarketState,
 } from './grad-market';
 import { store } from './store';
 
@@ -18,6 +18,8 @@ export interface GradMarketView {
   /** YES price in [0, 1]; null while halted (no liquidity). */
   yesPrice: number | null;
   phase: MarketPhase;
+  /** The permissionless step this market is waiting for (halt, resolve or settle), as of `updatedAt`. */
+  due: CrankStep | null;
   pool: { progress: number; complete: boolean; quoteReserveRaw: string; thresholdRaw: string } | null;
   /** mUSDC held by the pm-AMM vault, base units. */
   vaultRaw: string;
@@ -97,11 +99,11 @@ export async function readAllGradMarkets(fresh = false): Promise<Cache> {
     const d = b64(pmAccs[i]);
     const pm = d ? decodePmMarket(d) : null;
     return {
-      binding: b, pm, yesPrice: pm ? yesPrice(pm) : null, phase: phaseOf(b, pm, now), pool: poolView.get(b.pool) ?? null,
+      binding: b, pm, yesPrice: pm ? yesPrice(pm) : null, phase: phaseOf(b, pm, now, !!poolView.get(b.pool)?.complete), due: dueStep(b, now, !!poolView.get(b.pool)?.complete), pool: poolView.get(b.pool) ?? null,
       vaultRaw: tokenAmount(vaultAndFees[2 * i]), feesRaw: tokenAmount(vaultAndFees[2 * i + 1]),
     };
   });
-  const rank = (m: GradMarketView) => (m.phase === 'trading' ? 0 : m.phase === 'halted' || m.phase === 'expired' ? 1 : 2);
+  const rank = (m: GradMarketView) => (m.phase === 'trading' ? 0 : m.phase === 'known' || m.phase === 'halted' || m.phase === 'expired' ? 1 : 2);
   markets.sort((a, b) => rank(a) - rank(b) || a.binding.deadlineTs - b.binding.deadlineTs);
   const value = { updatedAt: now, markets };
   await s.set(K, value, 300);

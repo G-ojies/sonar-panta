@@ -22,6 +22,7 @@ const toRaw = (s: string) => BigInt(Math.round((Number(s) || 0) * 10 ** DEC));
 type Step = 'idle' | 'building' | 'signing' | 'broadcasting';
 const PHASE: Record<GradMarketView['phase'], { label: string; tone: string }> = {
   trading: { label: 'trading', tone: 'bg-ping/15 text-ping' },
+  known: { label: 'outcome known · halt due', tone: 'bg-amber/15 text-amber' },
   halted: { label: 'outcome known · halted', tone: 'bg-amber/15 text-amber' },
   expired: { label: 'deadline passed', tone: 'bg-amber/15 text-amber' },
   'resolved-yes': { label: 'resolved YES', tone: 'bg-yes/15 text-yes' },
@@ -120,6 +121,7 @@ export function GraduationMarkets({ initial }: { initial: GradPayload | null }) 
           {current && <TradeBox key={current.binding.address} m={current} wallet={wallet ?? null} holding={user?.holdings[current.binding.address] ?? null} busy={busy} step={step}
             onSwap={(direction, amountRaw) => send(`${direction.startsWith('buy') ? 'Bought' : 'Sold'} ${direction.endsWith('Yes') ? 'YES' : 'NO'}`, async (lib) => lib.swapPlan(publicKey!, current.binding.address, current.pm!, direction, amountRaw))}
             onClaim={() => send('Winnings claimed', async (lib) => lib.claimPlan(publicKey!, current.binding.address, current.pm!))}
+            onCrank={(s) => send(CRANK[s].done, async (lib) => lib.crankPlan(s, publicKey!, current.binding, current.pm!))}
           />}
           <OpenMarket wallet={wallet ?? null} busy={busy} step={step} now={now ?? Date.now() / 1000}
             onOpen={(pool, deadline, seedRaw) => send('Market opened', async (lib) => {
@@ -187,9 +189,17 @@ const DIRS = [
   { key: 'sellYes', label: 'Sell YES', tone: 'btn-yes' }, { key: 'sellNo', label: 'Sell NO', tone: 'btn-no' },
 ] as const;
 
-function TradeBox({ m, wallet, holding, busy, step, onSwap, onClaim }: {
+/** The permissionless steps, as the page offers them to any visitor. */
+const CRANK: Record<NonNullable<GradMarketView['due']>, { button: string; why: string; done: string }> = {
+  halt: { button: 'Sign & halt trading', why: 'The outcome is known. Halting pulls the liquidity so nobody can trade on it.', done: 'Trading halted' },
+  resolve: { button: 'Sign & resolve from the pool', why: 'The deadline has passed. Resolving reads the winner from the pool account.', done: 'Market resolved' },
+  settle: { button: 'Sign & settle to the opener', why: 'Settling returns the pulled liquidity and the fees to whoever opened the market.', done: 'Market settled' },
+};
+
+function TradeBox({ m, wallet, holding, busy, step, onSwap, onClaim, onCrank }: {
   m: GradMarketView; wallet: string | null; holding: { yesRaw: string; noRaw: string } | null; busy: boolean; step: Step;
   onSwap: (direction: (typeof DIRS)[number]['key'], amountRaw: bigint) => void; onClaim: () => void;
+  onCrank: (s: NonNullable<GradMarketView['due']>) => void;
 }) {
   const [dir, setDir] = useState<(typeof DIRS)[number]['key']>('buyYes');
   const [amount, setAmount] = useState('10');
@@ -215,10 +225,11 @@ function TradeBox({ m, wallet, holding, busy, step, onSwap, onClaim }: {
           </p>
           {!wallet ? <WalletButton /> : <button type="submit" disabled={busy || toRaw(amount) <= 0n} className="btn btn-primary h-10 w-full">{label ?? `Sign & ${DIRS.find((d) => d.key === dir)!.label.toLowerCase()}`}</button>}
         </form>
-      ) : m.phase === 'halted' || m.phase === 'expired' ? (
+      ) : m.phase === 'known' || m.phase === 'halted' || m.phase === 'expired' ? (
         <p className="mt-2 text-sm text-fog">
-          {m.phase === 'halted' ? 'The pool already shows the outcome, so the liquidity was pulled and trading stopped. ' : 'The deadline has passed. '}
-          The keeper resolves the market after the deadline; then winning tokens can be claimed here for 1 mUSDC each.
+          {m.phase === 'known' ? 'The curve has finished, so the answer is already on chain. Trading is closed here until the market is halted. '
+            : m.phase === 'halted' ? 'The outcome is known, so the liquidity was pulled and trading stopped. ' : 'The deadline has passed. '}
+          After the deadline the market resolves from the pool account; then winning tokens can be claimed here for 1 mUSDC each.
         </p>
       ) : (
         <div className="mt-2 space-y-2 text-sm">
@@ -229,6 +240,12 @@ function TradeBox({ m, wallet, holding, busy, step, onSwap, onClaim }: {
         </div>
       )}
       {holding && <p className="mono mt-3 text-[11px] text-fog-2">You hold {fmt(holding.yesRaw)} YES · {fmt(holding.noRaw)} NO</p>}
+      {m.due && (
+        <div className="mt-3 rounded-md border border-line bg-ink p-3 text-xs">
+          <p className="text-fog">{CRANK[m.due].why} Anyone can do this; it costs only the network fee{m.due === 'halt' ? ' and about 0.004 devnet SOL of rent' : ''}.</p>
+          {!wallet ? <div className="mt-2"><WalletButton /></div> : <button type="button" className="btn mt-2 h-9 w-full" disabled={busy} onClick={() => onCrank(m.due!)}>{label ?? CRANK[m.due].button}</button>}
+        </div>
+      )}
     </section>
   );
 }

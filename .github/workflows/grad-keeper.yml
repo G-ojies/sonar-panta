@@ -1,5 +1,8 @@
 # Cranks the grad_resolver graduation markets on devnet: halts a market once its pool shows the
-# outcome, resolves it after the deadline and settles it to the opener. Every step is
+# outcome, resolves it after the deadline and settles it to the opener, and opens a market on a launch
+# close to graduating when none is live on it. GitHub runs scheduled workflows on a best-effort basis
+# (on 28 Oct 2026 this one ran once in five hours), so the /graduation page also offers each due step to
+# any visitor; the keeper is a backstop, not the only path. Every step is
 # permissionless, so the keeper is a separate wallet holding only devnet SOL for fees and the
 # halt's two token accounts (about 0.004 SOL per market), never the programs' upgrade authority.
 name: grad-keeper
@@ -17,6 +20,8 @@ jobs:
     env:
       RPC: ${{ secrets.SOLANA_DEVNET_RPC }}
       KEEPER_KEYPAIR: ${{ secrets.GRAD_KEEPER_KEYPAIR }}
+      # Open a market on the launch closest to graduating when one has none (see the script header for limits).
+      AUTO_OPEN: '1'
     steps:
       - name: Check secrets
         id: check
