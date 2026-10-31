@@ -22,6 +22,10 @@ jobs:
       KEEPER_KEYPAIR: ${{ secrets.GRAD_KEEPER_KEYPAIR }}
       # Open a market on the launch closest to graduating when one has none (see the script header for limits).
       AUTO_OPEN: '1'
+      # Devnet launches rarely pass 6% of threshold, so a 60% bar left the page with no markets.
+      AUTO_MIN_PROGRESS: '3'
+      AUTO_SECS: '259200'
+      AUTO_MAX_LIVE: '3'
     steps:
       - name: Check secrets
         id: check
