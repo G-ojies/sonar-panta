@@ -314,7 +314,8 @@ function crank(cmd: string, binding: PublicKey, b: Binding): Promise<string> {
     ],
   };
   if (!keys[cmd]) throw new Error(`unknown command ${cmd}`);
-  return send([new TransactionInstruction({ programId: GRAD, keys: keys[cmd], data: ixDisc(cmd) })]);
+  // halt withdraws the pm-AMM liquidity, which alone burns ~345k CU, so the 400k default is not enough.
+  return send([new TransactionInstruction({ programId: GRAD, keys: keys[cmd], data: ixDisc(cmd) })], 800_000);
 }
 
 main().catch((e) => { console.error((e as Error).message); process.exit(1); });
