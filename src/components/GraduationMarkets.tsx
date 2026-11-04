@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import type { GradMarketView, GradPayload } from '@/lib/grad-market-server';
+import type { TradersPayload } from '@/lib/grad-traders-server';
 import { ago, dateShort, short } from '@/lib/format';
 import { useApi } from './useApi';
 import { WalletButton } from './WalletButton';
@@ -145,10 +146,12 @@ export function GraduationMarkets({ initial }: { initial: GradPayload | null }) 
         </aside>
       </div>
 
+      <TradersBoard wallet={wallet ?? null} />
+
       <p className="text-[11px] leading-relaxed text-fog-2">
         Program <a className="mono" href={explorer('account', payload?.program ?? '73G7X9FKEgTtNQMBWGsCGZfHHBpvVxsJ9kqvV6mvubJH')} target="_blank" rel="noopener noreferrer">{short(payload?.program ?? '73G7X9FKEgTtNQMBWGsCGZfHHBpvVxsJ9kqvV6mvubJH', 5)}</a> on devnet, priced by pm-AMM.
         Each market&apos;s pm-AMM authority is a program address, so no key picks the winner: once the pool shows the outcome anyone can halt trading, and after the deadline anyone can resolve it from the pool account.
-        JSON at <code className="mono">/api/graduation</code>.
+        JSON at <code className="mono">/api/graduation</code> and <code className="mono">/api/graduation/traders</code>.
       </p>
     </div>
   );
@@ -282,6 +285,49 @@ function OpenMarket({ wallet, busy, step, now, onOpen }: { wallet: string | null
           {!wallet ? <WalletButton /> : <button type="submit" className="btn btn-primary h-9 flex-1" disabled={busy || !ok}>{step === 'building' ? 'Building…' : step === 'signing' ? 'Approve in wallet…' : step === 'broadcasting' ? 'Broadcasting…' : 'Sign & open'}</button>}
         </div>
       </form>
+    </section>
+  );
+}
+
+/** The first 50 outside wallets to trade, read from chain. Team wallets are not counted. */
+function TradersBoard({ wallet }: { wallet: string | null }) {
+  const { data, error } = useApi<TradersPayload>('/api/graduation/traders', [], 60_000);
+  const mine = wallet ? data?.rows.findIndex((r) => r.wallet === wallet) ?? -1 : -1;
+  return (
+    <section className="card p-5" aria-labelledby="traders-h">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="traders-h" className="font-medium">First 50 traders</h2>
+        {data && (
+          <p className="text-xs text-fog">
+            <span className="mono text-paper">{data.traders}</span> wallets · <span className="mono text-paper">{data.trades}</span> trades · <span className="mono text-paper">{fmt(data.volumeRaw, 0)}</span> mUSDC volume
+          </p>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-fog-2">
+        Every buy and sell on these markets, read from devnet. Sonar&apos;s own keeper and test wallets are left out.
+        {wallet && mine >= 0 && <> You are <strong className="text-paper">#{mine + 1}</strong>.</>}
+      </p>
+      {error && !data ? <p className="mt-3 text-xs text-amber">Could not read the trades just now.</p>
+        : !data ? <p className="mt-3 text-xs text-fog-2">Reading trades…</p>
+        : data.rows.length === 0 ? <p className="mt-3 text-sm text-fog">No outside trades yet. Get test mUSDC above and take the first spot.</p>
+        : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-fog-2"><tr><th className="py-1 pr-3 font-normal">#</th><th className="py-1 pr-3 font-normal">Wallet</th><th className="py-1 pr-3 text-right font-normal">Trades</th><th className="py-1 pr-3 text-right font-normal">Volume</th><th className="py-1 text-right font-normal">Markets</th></tr></thead>
+              <tbody>
+                {data.rows.map((r, i) => (
+                  <tr key={r.wallet} className={`border-t border-line ${r.wallet === wallet ? 'bg-ping/10' : ''}`}>
+                    <td className="py-1.5 pr-3 mono text-fog">{i + 1}</td>
+                    <td className="py-1.5 pr-3"><a className="mono" href={explorer('account', r.wallet)} target="_blank" rel="noopener noreferrer">{short(r.wallet, 4)}</a></td>
+                    <td className="py-1.5 pr-3 mono text-right">{r.trades}</td>
+                    <td className="py-1.5 pr-3 mono text-right">{fmt(r.volumeRaw, 0)}</td>
+                    <td className="py-1.5 mono text-right">{r.markets}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
     </section>
   );
 }
